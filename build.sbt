@@ -103,8 +103,23 @@ lazy val legacyOkayjava = (project in file("legacy/okayjava"))
     Test / fork := true,
     publish / skip := true)
 
+/**
+ * THE KERNEL'S API (docs/design.md): the protocol — Type, Op, Computation, Step, Resume, Answers; code written once —
+ * Effects, Program, the shapes of handlers, Direct; the vocabulary of the standard effects. Pure Java, no dependency:
+ * `dev.okay:okay-kernel-api`
+ */
+lazy val api = (project in file("api"))
+  .settings(
+    name := "okay-kernel-api",
+    crossPaths := false,
+    autoScalaLibrary := false,
+    javacOptions ++= Seq("--release", "21", "-Xlint:all", "-Xlint:-serial", "-Werror"),
+    Compile / doc / javacOptions := Seq("--release", "21"),
+    libraryDependencies ++= Seq("com.github.sbt.junit" % "jupiter-interface" % "0.19.0" % Test, "org.junit.jupiter" % "junit-jupiter" % "5.13.4" % Test),
+    Compile / packageDoc / publishArtifact := false)
+
 lazy val root = (project in file("."))
-  .aggregate(legacy)
+  .aggregate(api, legacy)
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
 
 lazy val legacy = (project in file("legacy"))
