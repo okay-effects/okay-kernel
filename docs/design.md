@@ -50,34 +50,104 @@ int id()                // dense: a machine's array of handlers in force, by eff
 ```java
 interface Op<X>           { Type effect(); }
 interface Computation<A>  { Step<A> start(Answers host); }       // a program of any implementation, handed out
-sealed interface Step<A>  permits Done, Yield {}
-record Done<A>(A value)   implements Step<A> {}                   // it came to a value
-record Yield<X, A>(Op<X> op, Resume<X, A> k) implements Step<A> {} // it needs op; k the rest
-interface Resume<X, A>    { Step<A> resume(X x); }                // multi-shot; later, from another thread, too
+sealed interface Step<A>  permits Done, Yield, Failed, Cancelled {}
+record Done<A>(A value)                      implements Step<A> {}   // it came to a value
+record Yield<X, A>(Op<X> op, Resume<X, A> k) implements Step<A> {}   // it needs op; k the rest
+record Failed<A>(Throwable error)            implements Step<A> {}   // it failed: an exception, as data
+record Cancelled<A>()                        implements Step<A> {}   // cancelled from outside, its finalizers run
+interface Resume<X, A> {                                             // multi-shot; later, from another thread, too
+  Step<A> resume(X x);        // on, with the operation's value
+  Step<A> fail(Throwable e);  // on, the operation having thrown e where it was performed: catchable inside
+  Step<A> cancel();           // ended: its finalizers run, not catchable
+}
 interface Answers         { boolean answers(Type effect); <X> X value(Op<X> op); }   // answered in place
 ```
 
 - **Export.** An implementation runs its program on its own machine; an operation it has no handler of in force is
   first offered to its host in place (`host.value(op)`: no capture, no `Yield` — an `ask`, a `get` across systems
-  near free), and only if the host does not answer so, handed out: `Yield(op, k)`.
+  near free; if `value` throws, it is a `fail` where the operation was), and only if the host does not answer so,
+  handed out: `Yield(op, k)`.
 - **Import.** Another's `Computation` is a program of one's own: one's machine starts it, answers its operations with
   its own handlers, and hands out further what it cannot answer either.
 - **Handlers are not in the protocol**: to handle another's program is to run its steps and answer its yields.
 - **Cost** only where a program crosses: inside an implementation its own machine, nothing translated.
-- **Exceptions** of a program's functions crossing out are an operation: `Raise(e)` of `Throws[Throwable]`, handled
-  as any; unhandled at the top, thrown again.
-- **Delimited control across systems**: `shift0` to a delimiter of another implementation is an operation of the
-  effect `Control`, its delimiter's identity a fresh `Type`.
+- **Failures are data.** An exception of a program's functions, not caught inside, comes out as `Failed(e)`, not
+  thrown through another's machine; its host decides. `k.fail(e)` goes on as if the operation threw `e` where it was
+  performed (a generator's `throw`): an `Async` callback's error, a handler that cannot answer, a resource's
+  finalizers. Typed errors stay the effect `Throws[E]`.
+- **Cancellation is cooperative**: only where a program is suspended (a `Yield`), never in the middle of its code.
+  `k.cancel()` runs the program's finalizers — programs themselves, so it answers a `Step`: `Yield`s while they need
+  operations, `Cancelled` at the end, `Failed` if one failed. It cannot be caught (a `catch` swallowing a
+  cancellation is how cancellation breaks). A multi-shot `k`: cancelling one resumption cancels that path, its
+  finalizers once a path. An implementation with no finalizers answers `Cancelled` at once. Regions where
+  cancellation waits (`uncancelable`, so that `bracket` is safe): proposed for version 1 (§8).
+
+| what | as | caught |
+|---|---|---|
+| a typed error | the effect `Throws[E]` | yes |
+| a failure | `Failed`, `k.fail` | yes |
+| a cancellation | `Cancelled`, `k.cancel` | no: finalizers only |
 
 Proposed, to decide (§8): the program's runtime row, `Computation.effects(): Set<Type>`, checked at the border;
 an operation's value type, `Op.value(): Type`, checked in a debug mode.
+
+## 3a. Written once: `Effects` and the shapes of handlers
+
+Code meant for every implementation — the standard handlers first — is written once over `Effects`: what an
+implementation offers it. Each implementation's bridge implements `Effects` on its machine and takes the shapes of
+handlers as its own, so the standard handlers of the kernel work in every implementation.
+
+```java
+interface Effects {
+  <A> Prog<A> pure(A a);
+  <A, B> Prog<B> flatMap(Prog<A> p, Fn<A, Prog<B>> f);
+  <A> Prog<A> delay(Thunk<Prog<A>> p);
+  <X> Prog<X> perform(Op<X> op);
+  <A, R> Prog<R> handle(Handler<A, R> h, Program<A> body);
+  // control, the minimal pair: the answer types at the binary level only parameters, checked by the fronts
+  <A, I, O> Prog<A> shift0(Fn<Fn<A, Prog<I>>, Prog<O>> body);   // k the rest up to the nearest delimiter
+  <A, I, O> Prog<O> dollar(Program<A> body, Fn<A, Prog<I>> k);   // body under a fresh delimiter, its value to k
+}
+interface Program<A> { Prog<A> in(Effects e); }
+
+interface Handler<A, R>   { Type effect(); }                       // a handler is a delimiter too
+interface Answering<A, R> extends Handler<A, R> { <X> X value(Op<X> op); }   // answered in place
+interface Aborting<A, R>  extends Handler<A, R> { <X> R abort(Op<X> op); }   // k never called
+interface Returning<A, R> extends Handler<A, R> { R answer(A a); }           // its return a value
+interface General<A, R>   extends Handler<A, R> {                            // a clause with k
+  Prog<R> ret(A a, Effects e);
+  <X> Prog<R> apply(Op<X> op, Fn<X, Prog<R>> k, Effects e);
+}
+```
+
+| shape | needs `Effects` | the standard handlers |
+|---|---|---|
+| `Answering` | no | State (a cell), Reader, Emit's `forEach` |
+| `Aborting` | no | Throws |
+| `Returning` | no | almost all: Writer, Throws, Choose, State |
+| `General` | yes | Choose (all, first), Writer (functional), Emit's generators, Async, Control, `ensuring`, `bracket` |
+
+A handler may be two at once: a cell is `Answering` and `Returning`, `Choose` `General` and `Returning`. The first
+three are data, no `Effects`: an implementation's bridge makes them its own handlers once, at no cost (`Returning`
+under okay-core: handlers 40% faster). An interceptor (`local`, `handleWith`) is a `handle` whose clause performs
+the same operation outward (`e.perform(op)`): a clause runs outside its handler.
+
+**`Direct`, the fast path.** `Prog<A>` is the kernel's interface; an implementation's nodes do not know it, so its
+bridge wraps each and translates each bind — the cost of code written once. An implementation may implement
+`Direct` beside `Effects`: the same operations on its own programs, untyped (`Any`), so code written once is built
+in its nodes directly, a bind's function passed as it is, wrapped only at the edges (a clause, another's program).
+Measured (the mixed program, µs for 1000 orders): okay-core's `zero` 279 → 248, `cont` 284 → 219, okay-java 224 →
+204. Proposed in the API from the first (§8).
+
+Not written once, by design: the fronts (`A ! E1 + E2`, enums and matches, Java's capabilities), the machines, the
+platform (threads, timers: a hook), and programs where speed matters — they run on their implementation's own machine.
 
 ## 4. The vocabulary: the standard effects
 
 So that `Get` of okay and `Get` of okay-java mean one thing, the API declares the standard effects — their
 families, their operations as data, their `Type`s, and their laws, checked by the TCK:
 
-`State`, `Reader`, `Writer`, `Throws`, `Choose`, `Emit`, `Async`, `Control`.
+`State`, `Reader`, `Writer`, `Throws`, `Choose`, `Emit`, `Async`, `Control` — and finalizers: `ensuring`, `bracket`.
 
 Each operation family is a sealed interface of records with its CASES AS A VISITOR (`Cases`, each case's `fold`,
 proofs `Same<A, B>` whose only case is `Refl`): a handler written in Java or Scala 2 is total and typed with no
@@ -116,8 +186,11 @@ Scala 3, `lexical`, `Cont` in Java.
 1. The runtime row, `Computation.effects()`: proposed yes — a check at the border, an early error in place of "no
    handler" deep inside.
 2. An operation's value type, `Op.value()`: proposed yes, checked in a debug mode only.
-3. "A program written once, on any machine": `Program` and `Monad` in the API, so that code meant for every system —
-   the standard handlers first — is written once. Proposed yes.
+3. `Direct` in the API from the first, beside `Effects`: proposed yes.
+4. `uncancelable` regions in version 1: proposed yes — without them `bracket` is not safe.
+
+Decided: `Effects` its name; control (`shift0`, `$`) its methods; `Aborting` a shape; failures and cancellation
+outcomes of a step.
 
 ## 9. The plan
 
