@@ -201,7 +201,8 @@ lazy val okayCompat = (project in file("okay"))
 lazy val integration = (project in file("integration"))
   .dependsOn(tck, steps.jvm, stepsJava)
   .settings(
-    libraryDependencies ++= Seq("dev.okay" % "okay-java-kernel" % "0.1.0-SNAPSHOT" % Test, "okay-core-kernel" %% "okay-core-kernel" % "0.1.0-SNAPSHOT" % Test),
+    // okay-core and okay-java implement the API themselves (okay.core.kernel.OnCore, okay.core.Kernel), published locally
+    libraryDependencies ++= Seq("dev.okay" % "okay-java" % "0.2.0-SNAPSHOT" % Test, "okay-core" %% "okay-core" % "0.1.0-SNAPSHOT" % Test),
     Test / fork := true,
     publish / skip := true)
 
@@ -211,7 +212,7 @@ lazy val bench = (project in file("bench"))
   .enablePlugins(JmhPlugin)
   .dependsOn(steps.jvm, stepsJava)
   .settings(
-    libraryDependencies ++= Seq("dev.okay" % "okay-java-kernel" % "0.1.0-SNAPSHOT", "okay-core-kernel" %% "okay-core-kernel" % "0.1.0-SNAPSHOT"),
+    libraryDependencies ++= Seq("dev.okay" % "okay-java" % "0.2.0-SNAPSHOT", "okay-core" %% "okay-core" % "0.1.0-SNAPSHOT"),
     publish / skip := true)
 
 lazy val root = (project in file("."))

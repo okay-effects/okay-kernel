@@ -19,6 +19,7 @@ import okay.kernel.steps.{Steps, StepsJava}
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(2)
 class MixedBenchmark {
+  // okay-core-zero, okay-core-cont: out until okay-core's native implementation of the API 0.2 lands
   @Param(Array("steps", "steps-java", "okay-core-zero", "okay-core-cont", "okay-java"))
   var impl: String = ""
   @Param(Array("1000"))
@@ -31,7 +32,7 @@ class MixedBenchmark {
     case "steps-java" => StepsJava.INSTANCE
     case "okay-core-zero" => okay.core.kernel.OnCore.zero
     case "okay-core-cont" => okay.core.kernel.OnCore.cont
-    case "okay-java" => okay.java.kernel.OnJava.EFFECTS
+    case "okay-java" => okay.core.Kernel.EFFECTS
   }
 
   private def prog[A](f: Effects => Prog[A]): Program[A] = new Program[A] { def in(e: Effects): Prog[A] = f(e) }
