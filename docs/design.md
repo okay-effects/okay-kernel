@@ -115,25 +115,26 @@ kinds, macros, casts, `Nothing` in a supertype's arguments. A GADT match only on
 proofs, where it refines types; in Java that refinement is one equality witness (`Same<A, B>`), the only cast of
 the Java port, in one place.
 
-## 7. Questions still open
+## 7. Decided
 
-1. **One artifact on the JVM, or two?** The Scala kernel used from Java as it is (Java then needs scala-library),
-   or a Java port of it (no Scala at all, layer 4 then a boundary between the two). The second is what "port to
-   Java" says; the first is simpler and has no boundary.
-2. **Java's evidence.** Proofs passed by hand where Scala finds them: `Sub` and `Member` as static factories, the
-   handler giving its body the evidence. Is that weight acceptable, or should Java's rows be smaller (an effect a
-   parameter, as okay-java's capabilities)?
-3. **okay-core and okay-java afterwards.** Do they become fronts and examples over the new kernel, or stay
-   libraries of their own with adapters?
-4. **What is in okay-kernel now** (the API jar, `Steps`, `lexical`, `Cont` in Java, the typed view): rewritten in
-   place, or the new design in new packages beside it until it replaces them?
+- **Two artifacts.** Scala 3 is the source of truth, written in the subset Scala 2.13 shares (sealed traits and
+  case classes, no `enum` below the fronts), so one source compiles for Scala 3 and Scala 2.13, on the JVM, Scala.js
+  and Scala Native: `okay-kernel`. A Java port of it, the same structure and names, no Scala: `okay-kernel-java`. The
+  TCK — the same random programs, one digest — keeps the two in step. No bridge between them for now.
+- **ATM per effect is optional and decided by the prototype.** A row element is `E` (its answer any, unchanged) or
+  `E @ (I, O)`. The kernel's `Cont0[I, O, A]` has ATM anyway; whether rows expose it is decided after PState under a
+  Writer under a Choose, a typed printf and the TCK on it. If it costs too much, ATM stays at the nearest delimiter
+  (`Control`), the kernel unchanged.
+- **okay-core and okay-java stay libraries of their own, compatible**: the same TCK, the same std semantics.
+- **okay-kernel is rewritten in place**, on what was learned: `Cont0`'s machine (a small loop, the metacontinuation,
+  nesting up to `Deep`), answering in place by evidence, `Returning`, the digest-checked random programs.
+- **In version 1**: deep handlers and shallow ones (`k` without the handler, natural on `shift0`); interceptors
+  (`local`, `handleWith`); Async with fork/join; exceptions of a program's functions go through as they are.
+- **Names**: the root package `okay`; artifacts `okay-kernel` and `okay-kernel-java`.
 
-To check by a prototype before the rest is written:
-
-- per-effect ATM through intermediate handlers is sound: an operation at level `i` changes only its own answer
-  types, the levels between are captured into `k` unchanged (PState under a Writer under a Choose);
-- evidence by levels is as fast as okay-core's paths: the mixed program, against okay-core's 125 µs;
-- the Java front is writable: the TCK's programs written in Java, typed.
+To check by a prototype before the rest is written: per-effect ATM through the handlers between (above); evidence
+by levels as fast as okay-core's paths (the mixed program against its 125 µs); the Java front writable (the TCK's
+programs in Java, typed).
 
 ## 8. The plan
 
