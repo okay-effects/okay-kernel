@@ -42,7 +42,8 @@ public final class Control {
     };
   }
 
-  static <R> Handler<R, R> delimiter(Effect e) {
+  /** the delimiter of a prompt's effect: a shift0's clause in its place, a shift's under it again */
+  public static <R> Handler<R, R> delimiter(Effect e) {
     return new Handler<>() {
       public Effect effect() { return e; }
       public Prog<R> ret(R a, Monad m) { return m.pure(a); }

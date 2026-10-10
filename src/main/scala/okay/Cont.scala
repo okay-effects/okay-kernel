@@ -15,6 +15,8 @@ final class Cont[I, O, A] private[okay] (private[okay] val p: Program[A]):
   def flatMap[I2, B](f: Fn[A, Cont[I2, I, B]]): Cont[I2, O, B] =
     Cont(m => m.flatMap(p.in(m), a => f(a).p.in(m)))
   def map[B](f: Fn[A, B]): Cont[I, O, B] = Cont(m => m.map(p.in(m), f))
+  /** this program as a kernel `Program`, its answers said by its type only: to another language's `Cont` */
+  def program(): Program[A] = p
 
 object Cont:
   // the delimiters' effect, one for all — Java's `Cont` the same: a shift0 of one goes to a delimiter of the other
@@ -29,6 +31,9 @@ object Cont:
   private def inner[A](c: Cont[?, ?, ?]): Program[A] = c.p.asInstanceOf[Program[A]]
 
   def pure[S, A](a: A): Cont[S, S, A] = Cont(m => m.pure(a))
+  /** a kernel `Program` of another language's `Cont` (okay-java's), its answers as said: its delimiters are this
+   * one's — the effect `Reset0`, the API's `Shift0` */
+  def from[I, O, A](p: Program[A]): Cont[I, O, A] = Cont(p)
 
   /** A PROGRAM ANSWERING `R`: its value an `R`, its answer an `R`, unmoved — what a continuation `k(x)` gives that
    * moves no answer, the usual; `Cont.Flat[I, O, A]` is `Cont[Answer[I], Answer[O], A]` */

@@ -1,5 +1,6 @@
 package okay.jkernel.demo;
 
+import okay.jkernel.Cont;
 import okay.jkernel.std.Control;
 import okay.jkernel.std.Handlers;
 import okay.kernel.Program;
@@ -27,5 +28,16 @@ public final class Programs {
   /** 1 + reset(2 * shift(k -> k(k(10)))): 41 */
   public static Program<Integer> shifted() {
     return m -> m.map(Control.<Integer>reset(p -> mm -> mm.map(p.<Integer>shift(k -> m3 -> m3.flatMap(k.apply(10), k)).in(mm), x -> x * 2)).in(m), x -> x + 1);
+  }
+
+  /** shift0(k -> k(k(10))), open: its delimiter wherever it is run — Scala's {@code reset0} among them */
+  public static Cont<Cont<Integer, Integer, Integer>, Cont<Integer, Integer, Integer>, Integer> shift0Twice() {
+    return Cont.<Integer, Integer, Integer, Cont<Integer, Integer, Integer>, Integer>shift0(k -> k.apply(10).flatMap(k::apply));
+  }
+
+  /** reset0(body + 1), the body of any language's {@code Cont} */
+  public static Integer plusOneReset0(Program<Integer> body) {
+    return Cont.value(Cont.<Integer, Integer, Integer, Integer, Integer>reset0(
+        Cont.<Cont<Integer, Integer, Integer>, Cont<Integer, Integer, Integer>, Integer>from(body).map(x -> x + 1)));
   }
 }

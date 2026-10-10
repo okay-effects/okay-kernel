@@ -57,3 +57,17 @@ class TestBinary extends munit.FunSuite:
     JavaAsync.start(writer(later), Steps, done.complete(_), done.completeExceptionally(_))
     assertEquals(done.get(5, TimeUnit.SECONDS), (List("start", "got 41"), 42))
   }
+
+  test("Cont: Java's shift0 under Scala's reset0, Scala's shift0 under Java's — one delimiter, the effect Reset0") {
+    val javaShift = okay.Cont.from[okay.Cont[Int, Int, Int], okay.Cont[Int, Int, Int], Int](
+      JavaPrograms.shift0Twice().program().asInstanceOf[Program[Int]])
+    for m <- List(Steps, javas) do
+      assertEquals(okay.Cont.value(okay.Cont.reset0[Int, Int, Int, Int, Int](javaShift.map(_ + 1)), m), 12)
+    val scalaShift = okay.Cont.shift0[Int, Int, Int, okay.Cont[Int, Int, Int], Int](k => k(10).flatMap(k))
+    assertEquals(JavaPrograms.plusOneReset0(scalaShift.program().asInstanceOf[Program[Integer]]): Any, 12: Any)
+  }
+
+  test("levels: Java's lexical program, its capabilities and prompts, in Scala's lexical layer") {
+    val p = okay.lexical.Prog.of[okay.lexical.Top, Integer](JavaPrograms.shifted())
+    for m <- List(Steps, javas) do assertEquals(okay.lexical.Prog.run(p, m): Any, 41: Any)
+  }
