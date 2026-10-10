@@ -71,6 +71,8 @@ object Steps extends Effects {
   private final class FRestore(val outcome: Outcome) extends Frame
   /** another implementation's program waiting on an operation answered here: its `k` */
   private final class FForeign(val k: Resume[Any, Any]) extends Frame
+  /** a foreign program being cancelled, its finalizers' steps answered here: when it ends, `outcome` goes on */
+  private final class FAfter(val outcome: Outcome) extends Frame
 
   /** where the loop is: a node to run, a value, a failure, a cancellation */
   private sealed abstract class Outcome
@@ -155,7 +157,8 @@ object Steps extends Effects {
             top match {
               case b: FBind => out = guarded(node(b.f.apply(r.v)))
               case h: FHandler => h.h match {
-                case ret: Returning[Any, Any] @unchecked => out = new Ret(ret.answer(r.v))
+                case ret: Returning[Any, Any] @unchecked =>
+                  out = try new Ret(ret.answer(r.v)) catch { case e: Throwable if nonFatal(e) => new Thrown(e) }
                 case g: General[Any, Any] @unchecked => out = guarded(node(g.ret(r.v, this)))
                 case _ => out = r
               }
@@ -167,6 +170,7 @@ object Steps extends Effects {
               case FUncancelable =>
                 if (cancelPending) { cancelPending = false; out = Cancelling } else out = r
               case fr: FRestore => out = fr.outcome
+              case fa: FAfter => out = fa.outcome
               case f: FForeign =>
                 foreignStep(f.k.resume(r.v), stack) match { case fs: ForeignNext => stack = fs.stack; out = fs.out }
             }
@@ -186,10 +190,13 @@ object Steps extends Effects {
                 stack = new FRestore(t) :: stack
                 out = guarded(build(e.fin))
               case (fr: FRestore, _) => out = t // a finalizer failed: its failure goes on, the one it interrupted lost
+              case (fa: FAfter, _) => out = fa.outcome // a foreign program's cancellation failed: the outcome it was for goes on
+              case (FUncancelable, _) if cancelPending => cancelPending = false; out = Cancelling // the region ended, failed: the cancellation waiting goes on
               case (f: FForeign, e) if !e.isInstanceOf[Abort] =>
                 foreignStep(f.k.fail(e), stack) match { case fs: ForeignNext => stack = fs.stack; out = fs.out }
               case (f: FForeign, _) =>
-                foreignStep(f.k.cancel(), stack) match { case _ => out = t } // an abort crossing it: it is ended
+                // an abort crossing it: it is cancelled, its finalizers' operations answered here, then the abort goes on
+                foreignStep(f.k.cancel(), new FAfter(t) :: stack) match { case fs: ForeignNext => stack = fs.stack; out = fs.out }
               case _ => out = t
             }
         }
@@ -203,7 +210,9 @@ object Steps extends Effects {
                 stack = new FRestore(Cancelling) :: stack
                 out = guarded(build(e.fin))
               case f: FForeign =>
-                foreignStep(f.k.cancel(), stack) match { case fs: ForeignNext => stack = fs.stack; out = Cancelling }
+                // it is cancelled too, its finalizers' operations answered here, then this cancellation goes on
+                foreignStep(f.k.cancel(), new FAfter(Cancelling) :: stack) match { case fs: ForeignNext => stack = fs.stack; out = fs.out }
+              case fa: FAfter => out = fa.outcome
               case _ => out = Cancelling
             }
         }

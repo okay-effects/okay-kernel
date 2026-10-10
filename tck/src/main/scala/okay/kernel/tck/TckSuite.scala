@@ -116,6 +116,55 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
     assertEquals(run(e, Handlers.reader[Integer, java.util.List[Integer]](rd, int(4), Handlers.all(prog(x => x.foreign(outer))))), list(int(40), int(50)))
   }
 
+  // -- where implementations went wrong: each a check of its own
+
+  test(s"$name: k resumed under other handlers — an operation goes to the handler in force where it runs") {
+    val tick = Type.of("okay.kernel.tck.tick")
+    final case class Tick() extends Op[Void] { def effect(): Type = tick }
+    val body = prog(x => x.flatMap(x.perform(Tick()), fn((_: Void) => ask.in(x))))
+    // the clause resumes k under a reader of its own: the ask, in k, finds that one
+    val h = new General[Integer, Integer] {
+      def effect(): Type = tick
+      def ret(a: Integer, x: Effects): Prog[Integer] = x.pure(a)
+      def apply[X](op: Op[X], k: Fn[X, Prog[Integer]], x: Effects): Prog[Integer] =
+        Handlers.reader[Integer, Integer](rd, int(2), prog(_ => k(null.asInstanceOf[X]))).in(x)
+    }
+    assertEquals(run(e, Handlers.reader[Integer, Integer](rd, int(1), prog(x => x.handle(h, body)))).intValue, 2)
+  }
+
+  test(s"$name: a shift0's body runs outside its delimiter — a handler between is not in force there") {
+    val p = Handlers.reader[Integer, Integer](rd, int(1), prog { x =>
+      x.dollar[Integer, Integer, Integer](
+        Handlers.reader[Integer, Integer](rd, int(2), prog(y => y.shift0[Integer, Integer, Integer](fn((_: Fn[Integer, Prog[Integer]]) => ask.in(y))))),
+        fn((v: Integer) => x.pure(v)))
+    })
+    assertEquals(run(e, p).intValue, 1)
+  }
+
+  test(s"$name: a failure of a handler's answer is the program's, caught by recover") {
+    val none = Type.of("okay.kernel.tck.none")
+    val h = new Returning[Integer, Integer] {
+      def effect(): Type = none
+      def answer(a: Integer): Integer = throw new IllegalStateException("answer")
+    }
+    assertEquals(run(e, prog(x => x.recover[Integer](prog(_.handle(h, prog(_.pure(int(1))))), fn((_: Throwable) => x.pure(int(7)))))).intValue, 7)
+  }
+
+  test(s"$name: a cancellation waiting in a region that fails: the region's end cancels still") {
+    val c = e.computation(prog(x => x.recover[Integer](prog(y => y.uncancelable(prog(z => z.flatMap(ask.in(z),
+      fn((_: Integer) => z.failed[Integer](new RuntimeException("region"))))))), fn((_: Throwable) => x.pure(int(0))))), set(rd))
+    val wait = yielded(c.start(Answers.NONE)).k().cancel()
+    assert(yielded(wait).k().resume(int(5)).isInstanceOf[Step.Cancelled[?]], "cancelled, not recovered")
+  }
+
+  test(s"$name: a foreign program ended by an abort crossing it — its finalizers run, their operations answered here") {
+    val err = okay.kernel.std.Throws.of(Type.of("okay.kernel.tck.t2"))
+    val inner = e.computation(prog(x => x.ensuring(Handlers.raise[String, Integer](err, "stop"), Handlers.tell[String](log, "fin"))), set(err, log))
+    val p = Handlers.writer[String, Results.Result[String, Integer]](log, Handlers.throwsOf[String, Integer](err, prog(x => x.foreign(inner))))
+    val r = run(e, p)
+    assertEquals((r.log(), r.value().isInstanceOf[Results.Err[?, ?]]), (list("fin"), true))
+  }
+
   test(s"$name: a thousand random programs, the reference's digest") {
     val os = outcomes(e)
     assert(os.count(_.isRight) > 700, s"${os.count(_.isRight)} of 1000 came to a value")

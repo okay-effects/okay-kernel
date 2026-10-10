@@ -101,7 +101,7 @@ public final class StepsJava implements Effects {
 
   // -- the frames: the rest of the run, innermost first
 
-  private sealed interface Frame permits FBind, FHandler, FDollar, FRecover, FEnsuring, FUncancelable, FRestore, FForeign {}
+  private sealed interface Frame permits FBind, FHandler, FDollar, FRecover, FEnsuring, FUncancelable, FRestore, FForeign, FAfter {}
   private record FBind(Fn<Object, Prog<Object>> f) implements Frame {}
   /** compared by identity: an abort unwinds to this very frame */
   private static final class FHandler implements Frame {
@@ -116,6 +116,8 @@ public final class StepsJava implements Effects {
   private record FRestore(Outcome outcome) implements Frame {}
   /** another implementation's program waiting on an operation answered here: its {@code k} */
   private record FForeign(Resume<Object, Object> k) implements Frame {}
+  /** a foreign program being cancelled, its finalizers' steps answered here: when it ends, {@code outcome} goes on */
+  private record FAfter(Outcome outcome) implements Frame {}
 
   /** the frames, an immutable singly linked list; {@code null} the empty one */
   private record Frames(Frame head, Frames tail) {}
@@ -276,7 +278,11 @@ public final class StepsJava implements Effects {
           switch (top) {
             case FBind b -> out = guarded(() -> node(b.f().apply(r.v())));
             case FHandler h -> {
-              if (h.h instanceof Returning<Object, Object> ret) out = new Ret(ret.answer(r.v()));
+              if (h.h instanceof Returning<Object, Object> ret) {
+                Outcome o;
+                try { o = new Ret(ret.answer(r.v())); } catch (Throwable x) { if (!nonFatal(x)) throw x; o = new Thrown(x); }
+                out = o;
+              }
               else if (h.h instanceof General<Object, Object> g) out = guarded(() -> node(g.ret(r.v(), this)));
               else out = r;
             }
@@ -293,6 +299,7 @@ public final class StepsJava implements Effects {
               } else out = r;
             }
             case FRestore fr -> out = fr.outcome();
+            case FAfter fa -> out = fa.outcome();
             case FForeign f -> {
               ForeignNext fs = foreignStep(f.k().resume(r.v()), stack);
               stack = fs.stack();
@@ -318,14 +325,21 @@ public final class StepsJava implements Effects {
               out = guarded(() -> build(en.fin()));
             }
             case FRestore ignored -> out = t; // a finalizer failed: its failure goes on, the one it interrupted lost
+            case FAfter fa -> out = fa.outcome(); // a foreign program's cancellation failed: the outcome it was for goes on
+            case FUncancelable ignored -> {
+              // the region ended, failed: a cancellation waiting goes on
+              if (cancelPending) { cancelPending = false; out = Cancelling.INSTANCE; } else out = t;
+            }
             case FForeign f when !abort -> {
               ForeignNext fs = foreignStep(f.k().fail(e), stack);
               stack = fs.stack();
               out = fs.out();
             }
             case FForeign f -> {
-              f.k().cancel(); // an abort crossing it: it is ended
-              out = t;
+              // an abort crossing it: it is cancelled, its finalizers' operations answered here, then the abort goes on
+              ForeignNext fs = foreignStep(f.k().cancel(), push(new FAfter(t), stack));
+              stack = fs.stack();
+              out = fs.out();
             }
             default -> out = t;
           }
@@ -341,9 +355,12 @@ public final class StepsJava implements Effects {
               out = guarded(() -> build(e.fin()));
             }
             case FForeign f -> {
-              stack = foreignStep(f.k().cancel(), stack).stack();
-              out = c;
+              // it is cancelled too, its finalizers' operations answered here, then this cancellation goes on
+              ForeignNext fs = foreignStep(f.k().cancel(), push(new FAfter(c), stack));
+              stack = fs.stack();
+              out = fs.out();
             }
+            case FAfter fa -> out = fa.outcome();
             default -> out = c;
           }
         }
