@@ -28,3 +28,33 @@ abstract class TestContOn(m: Monad) extends munit.FunSuite:
 
 class TestContSteps extends TestContOn(Steps)
 class TestContRef extends TestContOn(Ref)
+
+/** SHIFT0 AND $ WITH THE ANSWER TYPE MODIFIED, on every monad */
+abstract class TestCont0On(m: Monad) extends munit.FunSuite:
+  import okay.Cont0 as C
+
+  test("$: the return clause, put back by each k — List(10, 20)") {
+    val p = C.dollar[C[List[Int], List[Int], List[Int]], List[Int], List[Int], List[Int], Int](
+      a => C.pure(List(a)),
+      C.shift0[List[Int], List[Int], List[Int], C[List[Int], List[Int], List[Int]], Int](
+        k => k(1).flatMap(xs => k(2).map(ys => xs ++ ys))).map(_ * 10))
+    assertEquals(C.value(p, m), List(10, 20))
+  }
+
+  test("$ moving the answer: the body an Int, the return a String, the clause a String's length") {
+    // ret: Int to C[String]; the clause takes k's String and answers its length — the answer Int at the end
+    val p = C.dollar[C[String, String, String], Int, Int, Int, Int](
+      a => C.pure[String, String]("n=" + a),
+      C.shift0[String, String, String, C[Int, Int, Int], Int](k => C.pure(C.value(k(7), m).length)).map(_ * 6))
+    assertEquals(C.value(p, m), "n=42".length)
+  }
+
+  test("two shift0 deep: the body outside both delimiters, dropping both — -1") {
+    val inner = C.reset0[Int, C[Int, Int, Int], C[Int, Int, Int], Int, Int](
+      C.shift0[Int, Int, Int, C[C[Int, Int, Int], C[Int, Int, Int], Int], Int](
+        _ => C.shift0[Int, Int, Int, C[Int, Int, Int], Int](_ => C.pure(-1))).map(_ + 10))
+    assertEquals(C.value(C.reset0[Int, Int, Int, Int, Int](inner.map(_ * 2)), m), -1)
+  }
+
+class TestCont0Steps extends TestCont0On(Steps)
+class TestCont0Ref extends TestCont0On(Ref)

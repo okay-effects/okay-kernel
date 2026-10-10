@@ -16,6 +16,7 @@ class TestControlFromJavaRef extends TestControlFromJava(Ref)
 abstract class TestContFromJava(m: Monad) extends munit.FunSuite:
   test("the answer moved, Integer to String: got 6") { assertEquals(ContFromJava.moved(m), "got 6") }
   test("shift0's: 12") { assertEquals(ContFromJava.shift0(m): Any, 12: Any) }
+  test("$ moving the answer, from Java: 4") { assertEquals(ContFromJava.dollar(m): Any, 4: Any) }
 
 class TestContFromJavaSteps extends TestContFromJava(Steps)
 class TestContFromJavaRef extends TestContFromJava(Ref)
