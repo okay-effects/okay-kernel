@@ -38,7 +38,16 @@ lazy val scala2 = (project in file("scala2"))
     c / dependencyClasspath ++= Classpaths.managedJars(Scala3Stdlib, Set("jar"), update.value),
     c / dependencyClasspathAsJars ++= Classpaths.managedJars(Scala3Stdlib, Set("jar"), update.value))))
 
+/** THE KERNEL'S MONADS ON OKAY-CORE: its machines `zero` and `cont`, the kernel's suites on them (okay-core
+ * published locally: `sbt coreJVM/publishLocal` in okay-core) */
+lazy val okaycore = (project in file("okaycore"))
+  .dependsOn(core.jvm % "compile->compile;test->test")
+  .settings(
+    libraryDependencies ++= Seq("okay-core" %% "okay-core" % "0.1.0-SNAPSHOT", "org.scalameta" %% "munit" % "1.2.3" % Test),
+    Test / fork := true,
+    publish / skip := true)
+
 lazy val root = (project in file("."))
-  .aggregate(core.jvm, core.js, core.native, scala2)
+  .aggregate(core.jvm, core.js, core.native, scala2, okaycore)
   // the aggregate only: the sources are the cross-project's
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
