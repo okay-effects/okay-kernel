@@ -39,3 +39,15 @@ class TestLexicalLeaks extends munit.FunSuite:
     val e = Javac.errors(writing.format("Prog<Top, Integer> p = w.tell(\"x\").map(u -> 1); return Prog.pure(1);"))
     assert(e.exists(_.contains("incompatible types")), e.toString)
   }
+
+/** the answer type, moved by a shift, checked by Java's compiler */
+class TestContTypes extends munit.FunSuite:
+  val moving = """okay.Cont<Integer, String, Integer> b = okay.Cont.<Integer, String, Integer>shift(k -> okay.Cont.pure("x"));
+    |%s""".stripMargin
+  test("the reset's answer what the shift moved it to, a String: compiles") {
+    assertEquals(Javac.errors(moving.format("okay.Cont<Object, Object, String> r = okay.Cont.reset(b); return r;")), Nil)
+  }
+  test("taken as an Integer, the answer before the move: does not compile") {
+    val e = Javac.errors(moving.format("okay.Cont<Object, Object, Integer> r = okay.Cont.reset(b); return r;"))
+    assert(e.nonEmpty, "compiled")
+  }

@@ -11,3 +11,11 @@ abstract class TestControlFromJava(m: Monad) extends munit.FunSuite:
 
 class TestControlFromJavaSteps extends TestControlFromJava(Steps)
 class TestControlFromJavaRef extends TestControlFromJava(Ref)
+
+/** Java's shift and reset with the answer type moved, on every monad */
+abstract class TestContFromJava(m: Monad) extends munit.FunSuite:
+  test("the answer moved, Integer to String: got 6") { assertEquals(ContFromJava.moved(m), "got 6") }
+  test("shift0's: 12") { assertEquals(ContFromJava.shift0(m): Any, 12: Any) }
+
+class TestContFromJavaSteps extends TestContFromJava(Steps)
+class TestContFromJavaRef extends TestContFromJava(Ref)

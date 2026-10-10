@@ -9,9 +9,9 @@ import okay.kernel.{Effect, Fn, Handler, Monad, Op, Prog, Program, Steps}
  * erased to `Any` inside it
  */
 final class Cont0[I, O, A] private[okay] (private[okay] val p: Program[A]):
-  def flatMap[I2, B](f: A => Cont0[I2, I, B]): Cont0[I2, O, B] =
+  def flatMap[I2, B](f: Fn[A, Cont0[I2, I, B]]): Cont0[I2, O, B] =
     Cont0(m => m.flatMap(p.in(m), a => f(a).p.in(m)))
-  def map[B](f: A => B): Cont0[I, O, B] = Cont0(m => m.map(p.in(m), a => f(a)))
+  def map[B](f: Fn[A, B]): Cont0[I, O, B] = Cont0(m => m.map(p.in(m), f))
 
 object Cont0:
   private val effect: Effect = Effect.of("Reset0")
@@ -28,13 +28,14 @@ object Cont0:
 
   def pure[S, A](a: A): Cont0[S, S, A] = Cont0(m => m.pure(a))
   /** the rest up to the nearest delimiter, the delimiter included, to `f`, run in its place: its answer `O` */
-  def shift0[I1, O1, X1, O, A](f: (A => Cont0[I1, O1, X1]) => O): Cont0[Cont0[I1, O1, X1], O, A] =
+  def shift0[I1, O1, X1, O, A](f: Fn[Fn[A, Cont0[I1, O1, X1]], O]): Cont0[Cont0[I1, O1, X1], O, A] =
     Cont0(m => m.perform(Shift0Op[A](k => program(f(a => Cont0(_ => k(a).asInstanceOf[Prog[X1]])).asInstanceOf[Cont0[?, ?, ?]]))))
   /** `ret $ body`: `body` under a delimiter, its value to `ret` */
-  def dollar[I, I2, O2, B, A](ret: A => I, body: Cont0[I, Cont0[I2, O2, B], A]): Cont0[I2, O2, B] =
+  def dollar[I, I2, O2, B, A](ret: Fn[A, I], body: Cont0[I, Cont0[I2, O2, B], A]): Cont0[I2, O2, B] =
     Cont0(m => m.handle(delimiter[A](a => program(ret(a).asInstanceOf[Cont0[?, ?, ?]])), body.p).asInstanceOf[Prog[B]])
   /** `body` under a delimiter, its value the answer */
   def reset0[J, I2, O2, B, A](body: Cont0[Cont0[J, J, A], Cont0[I2, O2, B], A]): Cont0[I2, O2, B] =
     Cont0(m => m.handle(delimiter[A](a => (pm: Monad) => pm.pure[Any](a)), body.p).asInstanceOf[Prog[B]])
   /** a program closed, run: its answer */
-  def value[A](c: Cont0[A, A, A], m: Monad = Steps): A = Program.run(c.p, m)
+  def value[A](c: Cont0[A, A, A]): A = Program.run(c.p, Steps)
+  def value[A](c: Cont0[A, A, A], m: Monad): A = Program.run(c.p, m)
