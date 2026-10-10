@@ -191,6 +191,15 @@ lazy val integration = (project in file("integration"))
     Test / fork := true,
     publish / skip := true)
 
+/** THE IMPLEMENTATIONS MEASURED: one program written once over `Effects`, on each (JMH; the bridges published
+ * locally from their repositories). Not published */
+lazy val bench = (project in file("bench"))
+  .enablePlugins(JmhPlugin)
+  .dependsOn(steps.jvm, stepsJava)
+  .settings(
+    libraryDependencies ++= Seq("dev.okay" % "okay-java-kernel" % "0.1.0-SNAPSHOT", "okay-core-kernel" %% "okay-core-kernel" % "0.1.0-SNAPSHOT"),
+    publish / skip := true)
+
 lazy val root = (project in file("."))
   .aggregate(api, scalaApi.jvm, scalaApi.js, scalaApi.native, steps.jvm, steps.js, steps.native, stepsJava, tck, legacy)
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
