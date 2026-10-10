@@ -27,6 +27,25 @@ object Cont0:
   private def inner[A](c: Cont0[?, ?, ?]): Program[A] = c.p.asInstanceOf[Program[A]]
 
   def pure[S, A](a: A): Cont0[S, S, A] = Cont0(m => m.pure(a))
+
+  /** a program whose answer is its value: a rest `k(x)` that moves no answer — the usual */
+  type Rest[R] = Cont0[R, R, R]
+
+  /** THE DELIMITERS OF ANSWER `R`: their operations, `R` given once — at a call, only the operation's value, `A`
+   * (`k` takes an `A`: no lambda tells it) */
+  final class At[R] private[Cont0] ():
+    /** shift0, the answer kept: `k` and the clause at `R` */
+    def shift0[A](f: Fn[Fn[A, Rest[R]], Rest[R]]): Cont0[Rest[R], Rest[R], A] = Cont0.shift0[R, R, R, Rest[R], A](f)
+    /** shift0, the answer moved to `O`: `k` at `R`, the clause's answer an `O` */
+    def shift0To[A, O](f: Fn[Fn[A, Rest[R]], O]): Cont0[Rest[R], O, A] = Cont0.shift0[R, R, R, O, A](f)
+    /** a delimiter: the body's value the answer */
+    def reset0(body: Cont0[Rest[R], Rest[R], R]): Rest[R] = Cont0.reset0[R, R, R, R, R](body)
+    /** `ret $ body`, the body's value of type `A` to the answer through `ret` */
+    def dollar[A](ret: Fn[A, Rest[R]], body: Cont0[Rest[R], Rest[R], A]): Rest[R] = Cont0.dollar[Rest[R], R, R, R, A](ret, body)
+    def pure[A](a: A): Cont0[R, R, A] = Cont0.pure[R, A](a)
+
+  /** the delimiters of answer `R`: `Cont0.at[Int]`, Java's `Cont0.<Integer>at()` */
+  def at[R]: At[R] = At[R]()
   /** the rest up to the nearest delimiter, the delimiter included, to `f`, run in its place: its answer `O` */
   def shift0[I1, O1, X1, O, A](f: Fn[Fn[A, Cont0[I1, O1, X1]], O]): Cont0[Cont0[I1, O1, X1], O, A] =
     Cont0(m => m.perform(Shift0Op[A](k => inner(f(a => Cont0(_ => k(a).asInstanceOf[Prog[X1]])).asInstanceOf[Cont0[?, ?, ?]]))))

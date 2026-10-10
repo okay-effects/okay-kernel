@@ -25,6 +25,22 @@ object Cont:
 
   def pure[S, A](a: A): Cont[S, S, A] = Cont(m => m.pure(a))
 
+  /** a program whose answer is its value: a rest `k(x)` that moves no answer — the usual */
+  type Rest[R] = Cont[R, R, R]
+
+  /** THE RESETS OF ANSWER `R`: their operations, `R` given once — at a call, only the operation's value, `A` */
+  final class At[R] private[Cont] ():
+    /** shift, the answer kept */
+    def shift[A](f: Fn[Fn[A, Rest[R]], Rest[R]]): Cont[R, R, A] = Cont.shift[R, R, A](f)
+    /** shift, the answer moved from `R` to `O`: `k` answering `R` at the hole, the clause at `O` */
+    def shiftTo[A, O](f: Fn[Fn[A, Cont[O, O, R]], Cont[O, O, O]]): Cont[R, O, A] = Cont.shift[R, O, A](f)
+    /** a reset: the body at the answer `R`, its value; the reset answers `O`, what the body moved it to */
+    def reset[O](body: Cont[R, O, R]): Cont[O, O, O] = Cont.reset[O, R, O](body)
+    def pure[A](a: A): Cont[R, R, A] = Cont.pure[R, A](a)
+
+  /** the resets of answer `R`: `Cont.at[Int]`, Java's `Cont.<Integer>at()` */
+  def at[R]: At[R] = At[R]()
+
   /** `shift(k => body)`: `k` the rest up to the nearest reset, the reset included, answering `I` at the hole; the
    * body under the reset again, at its final answer `O` — the answer moved from `I` to `O` */
   def shift[I, O, A](f: Fn[Fn[A, Cont[O, O, I]], Cont[O, O, O]]): Cont[I, O, A] =

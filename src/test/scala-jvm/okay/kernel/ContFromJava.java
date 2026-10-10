@@ -23,6 +23,25 @@ public final class ContFromJava {
     return Cont0.value(p, m);
   }
 
+  /** short: the answer's type given once — 12 */
+  public static Integer short0(Monad m) {
+    Cont0.At<Integer> d = Cont0.at();
+    return Cont0.value(d.reset0(d.<Integer>shift0(k -> k.apply(10).flatMap(x -> k.apply(x))).map(x -> x + 1)), m);
+  }
+
+  /** short, shift: the answer moved, Integer to String — "got 6" */
+  public static String shortMoved(Monad m) {
+    Cont.At<Integer> d = Cont.at();
+    return Cont.value(d.reset(d.<Integer, String>shiftTo(k -> Cont.pure("got " + Cont.eval(k.apply(5), m))).map(x -> x + 1)), m);
+  }
+
+  /** the full shift0, no type written at the call: Java's inference from the variable's type — 12 */
+  public static Integer byTarget(Monad m) {
+    Cont0<Cont0<Integer, Integer, Integer>, Cont0<Integer, Integer, Integer>, Integer> s =
+        Cont0.shift0(k -> k.apply(10).flatMap(x -> k.apply(x)));
+    return Cont0.value(Cont0.reset0(s.map(x -> x + 1)), m);
+  }
+
   /** shift0's: reset0(1 + shift0(k -> k(k(10)))) — 12 */
   public static Integer shift0(Monad m) {
     Cont0<Integer, Integer, Integer> p = Cont0.reset0(

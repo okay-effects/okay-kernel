@@ -17,6 +17,11 @@ abstract class TestContFromJava(m: Monad) extends munit.FunSuite:
   test("the answer moved, Integer to String: got 6") { assertEquals(ContFromJava.moved(m), "got 6") }
   test("shift0's: 12") { assertEquals(ContFromJava.shift0(m): Any, 12: Any) }
   test("$ moving the answer, from Java: 4") { assertEquals(ContFromJava.dollar(m): Any, 4: Any) }
+  test("short, from Java: 12; the answer moved: got 6") {
+    assertEquals(ContFromJava.short0(m): Any, 12: Any)
+    assertEquals(ContFromJava.shortMoved(m), "got 6")
+  }
+  test("the full shift0, its types by the variable's: 12") { assertEquals(ContFromJava.byTarget(m): Any, 12: Any) }
 
 class TestContFromJavaSteps extends TestContFromJava(Steps)
 class TestContFromJavaRef extends TestContFromJava(Ref)

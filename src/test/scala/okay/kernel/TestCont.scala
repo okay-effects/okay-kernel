@@ -58,3 +58,25 @@ abstract class TestCont0On(m: Monad) extends munit.FunSuite:
 
 class TestCont0Steps extends TestCont0On(Steps)
 class TestCont0Ref extends TestCont0On(Ref)
+
+/** the same, written short: the answer's type given once, at a call the operation's value only */
+abstract class TestContShortOn(m: Monad) extends munit.FunSuite:
+  import okay.{Cont, Cont0}
+
+  test("shift0, short: reset0(1 + shift0(k => k(k(10)))) is 12") {
+    val d = Cont0.at[Int]
+    assertEquals(Cont0.value(d.reset0(d.shift0[Int](k => k(10).flatMap(k)).map(_ + 1)), m), 12)
+  }
+  test("$, short: List(10, 20)") {
+    val d = Cont0.at[List[Int]]
+    assertEquals(Cont0.value(d.dollar[Int](a => Cont0.pure(List(a)), d.shift0[Int](k => k(1).flatMap(xs => k(2).map(xs ++ _))).map(_ * 10)), m),
+      List(10, 20))
+  }
+  test("shift, short: the answer kept — 12; moved Int to String — got 6") {
+    val d = Cont.at[Int]
+    assertEquals(Cont.value(d.reset(d.shift[Int](k => k(10).flatMap(k)).map(_ + 1)), m), 12)
+    assertEquals(Cont.value(d.reset(d.shiftTo[Int, String](k => Cont.pure("got " + Cont.eval(k(5), m))).map(_ + 1)), m), "got 6")
+  }
+
+class TestContShortSteps extends TestContShortOn(Steps)
+class TestContShortRef extends TestContShortOn(Ref)
