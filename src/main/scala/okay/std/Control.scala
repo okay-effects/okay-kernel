@@ -30,7 +30,7 @@ def reset[R, X](body: Prompt[R] => R ! (Ctl & X)): R ! X =
     m.handle(delimiter[R](p.effect), body(p))
   }
 
-private def delimiter[R](e: Effect): Handler[R, R] = new Handler[R, R]:
+private[okay] def delimiter[R](e: Effect): Handler[R, R] = new Handler[R, R]:
   def effect: Effect = e
   def ret(a: R, m: Monad): Prog[R] = m.pure(a)
   def apply[X](op: Op[X], k: Fn[X, Prog[R]], m: Monad): Prog[R] = op match

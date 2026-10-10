@@ -37,6 +37,13 @@ object Prog:
       m.handle(handler(e), body.in(Cap(e)))
     })
 
+  /** a delimiter of a fresh prompt, its body given the prompt: its body's value the answer */
+  def reset[L, R](body: ResetBody[L, R]): Prog[L, R] =
+    Prog(m => {
+      val e = Effect("Prompt")
+      m.handle(okay.std.delimiter[R](e), body.in[L](Prompt[L, L, R](e)))
+    })
+
   /** a log of `W`s: the log, first told first, and the value */
   def writer[L, W, A](body: WriterBody[L, W, A]): Prog[L, Logged[W, A]] =
     Prog(m => {
@@ -95,3 +102,17 @@ trait Throws[L, E]:
   def raise[X](e: E): Prog[L, X]
   def at[M <: L]: Throws[M, E] = this.asInstanceOf[Throws[M, E]]
 
+
+/** a reset's body: a generic method, its level `M` fresh — given the prompt, at `M` */
+trait ResetBody[L, R]:
+  def in[M <: L](p: Prompt[L, M, R]): Prog[M, R]
+
+/** A RESET'S PROMPT, at the body's level `M`, the reset's `L`, its answer `R`: shift0 and shift to it, by identity —
+ * past any reset nearer */
+final class Prompt[L, M, R] private[lexical] (e: Effect):
+  /** the rest up to this reset, the reset included, to the clause, run in its place — outside it */
+  def shift0[X](clause: Fn[Fn[X, Prog[L, R]], Prog[L, R]]): Prog[M, X] =
+    Prog.of(m => m.perform(okay.std.Shift0[X, R](e, k => clause(x => Prog.of[L, R](_ => k(x))))))
+  /** the same, the clause under the reset again (Danvy–Filinski) */
+  def shift[X](clause: Fn[Fn[X, Prog[L, R]], Prog[M, R]]): Prog[M, X] =
+    Prog.of(m => m.perform(okay.std.Shift[X, R](e, k => clause(x => Prog.of[L, R](_ => k(x))))))
