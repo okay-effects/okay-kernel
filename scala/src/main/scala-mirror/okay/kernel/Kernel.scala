@@ -42,8 +42,21 @@ object Type {
     else c
 }
 
+/** an effect's key, typed — the mirror of the Java API's `Key` (its one trusted step, `of`) */
+final class Key[F] private (private val t: Type) {
+  def `type`(): Type = t
+  def owns(op: Op[?]): Boolean = op.key() eq this
+  override def toString: String = t.toString
+}
+object Key {
+  private val known = scala.collection.mutable.HashMap.empty[Type, Key[?]]
+  def of[F](t: Type): Key[F] = synchronized { known.getOrElseUpdate(t, new Key[F](t)).asInstanceOf[Key[F]] }
+  def fresh[F](): Key[F] = new Key[F](Type.fresh())
+}
+
 trait Op[X] {
-  def effect(): Type
+  def key(): Key[?]
+  def effect(): Type = key().`type`()
   def value(): Type = null
 }
 
@@ -108,7 +121,10 @@ trait Effects {
   def foreign[A](computation: Computation[A]): Prog[A]
 }
 
-trait Handler[A, R] { def effect(): Type }
+trait Handler[A, R] {
+  def key(): Key[?]
+  def effect(): Type = key().`type`()
+}
 trait Answering[A, R] extends Handler[A, R] { def value[X](op: Op[X]): X }
 trait Aborting[A, R] extends Handler[A, R] { def abort[X](op: Op[X]): R }
 trait Returning[A, R] extends Handler[A, R] { def answer(a: A): R }

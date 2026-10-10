@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import okay.kernel.Key;
 import okay.kernel.Answers;
 import okay.kernel.Computation;
 import okay.kernel.Effects;
@@ -32,10 +33,10 @@ import org.junit.jupiter.api.Test;
 class StepsJavaTest {
   static final StepsJava M = StepsJava.INSTANCE;
   static final Type INT = Type.of(Integer.class);
-  static final Type ST = State.of(INT);
-  static final Type LOG = Writer.of(Type.of(String.class));
-  static final Type ERR = Throws.of(Type.of(String.class));
-  static final Type RD = Reader.of(INT);
+  static final Key<State<Integer>> ST = State.key(INT);
+  static final Key<Writer<String>> LOG = Writer.key(Type.of(String.class));
+  static final Key<Throws<String>> ERR = Throws.key(Type.of(String.class));
+  static final Key<Reader<Integer>> RD = Reader.key(INT);
 
   static <A> A run(Program<A> p) { return M.run(p); }
 
@@ -51,7 +52,7 @@ class StepsJavaTest {
 
   /** an ask handed out, answered {@code n} through its cases: its value typed by the operation */
   static <X, A> Step<A> answer(Step.Yield<X, A> y, int n) {
-    return y.k().resume(Reader.<Integer, X>narrow(y.op()).fold(v -> v.apply(n)));
+    return y.k().resume(Reader.narrow(RD, y.op()).fold(v -> v.apply(n)));
   }
 
   static Program<Integer> count(int n) {
@@ -102,7 +103,7 @@ class StepsJavaTest {
   }
 
   @Test void aGeneratorPulledOneByOne() {
-    Type em = Emit.of(INT);
+    Key<Emit<Integer>> em = Emit.key(INT);
     Program<String> three = e ->
         e.flatMap(Handlers.send(em, 1).in(e), u -> e.flatMap(Handlers.send(em, 2).in(e), u2 -> e.pure("done")));
     Results.Gen<Integer, String> g = run(Handlers.generate(em, three));
@@ -127,25 +128,25 @@ class StepsJavaTest {
   static final Program<Integer> ASK = Handlers.ask(RD);
 
   @Test void exportMultiShotK() {
-    Computation<Integer> c = M.computation(e -> e.map(ASK.in(e), n -> n + 1), Set.of(RD));
+    Computation<Integer> c = M.computation(e -> e.map(ASK.in(e), n -> n + 1), Set.of(RD.type()));
     Step.Yield<?, Integer> y = yielded(c.start(Answers.NONE));
     assertEquals(42, done(answer(y, 41)));
     assertEquals(2, done(answer(y, 1)));
-    assertEquals(Set.of(RD), c.effects());
+    assertEquals(Set.of(RD.type()), c.effects());
     assertThrows(UnsupportedOperationException.class, () -> c.effects().clear());
   }
 
   @Test void exportAnsweredInPlaceByTheHost() {
     Answers host = new Answers() {
-      public boolean answers(Type t) { return t == RD; }
-      public <X> X value(Op<X> op) { return Reader.<Integer, X>narrow(op).fold(v -> v.apply(41)); }
+      public boolean answers(Type t) { return t == RD.type(); }
+      public <X> X value(Op<X> op) { return Reader.narrow(RD, op).fold(v -> v.apply(41)); }
     };
-    Computation<Integer> c = M.computation(e -> e.map(ASK.in(e), n -> n + 1), Set.of(RD));
+    Computation<Integer> c = M.computation(e -> e.map(ASK.in(e), n -> n + 1), Set.of(RD.type()));
     assertEquals(42, done(c.start(host)));
   }
 
   @Test void kFailCaughtWhereTheOperationWas() {
-    Computation<Integer> c = M.computation(e -> e.recover(ASK, t -> e.pure(-1)), Set.of(RD));
+    Computation<Integer> c = M.computation(e -> e.recover(ASK, t -> e.pure(-1)), Set.of(RD.type()));
     assertEquals(-1, done(yielded(c.start(Answers.NONE)).k().fail(new RuntimeException("x"))));
   }
 
@@ -155,18 +156,18 @@ class StepsJavaTest {
       finalized.incrementAndGet();
       return e.pure(null);
     };
-    Computation<Integer> c = M.computation(e -> e.recover(e2 -> e2.ensuring(ASK, fin), t -> e.pure(0)), Set.of(RD));
+    Computation<Integer> c = M.computation(e -> e.recover(e2 -> e2.ensuring(ASK, fin), t -> e.pure(0)), Set.of(RD.type()));
     Step<Integer> cancelled = yielded(c.start(Answers.NONE)).k().cancel();
     assertInstanceOf(Step.Cancelled.class, cancelled, "cancelled, recover not taken");
     assertEquals(1, finalized.get(), "the finalizer once");
-    Computation<Integer> u = M.computation(e -> e.uncancelable(ASK), Set.of(RD));
+    Computation<Integer> u = M.computation(e -> e.uncancelable(ASK), Set.of(RD.type()));
     Step.Yield<?, Integer> waiting = yielded(yielded(u.start(Answers.NONE)).k().cancel());
     assertInstanceOf(Step.Cancelled.class, answer(waiting, 5), "the region waits; its end cancels");
   }
 
   @Test void importAnotherProgramUnderThisOnesHandlers() {
     Computation<Integer> inner = M.computation(e ->
-        e.flatMap(ASK.in(e), n -> e.map(Handlers.among(List.of(n, n + 1)).in(e), x -> x * 10)), Set.of(RD, Choose.TYPE));
+        e.flatMap(ASK.in(e), n -> e.map(Handlers.among(List.of(n, n + 1)).in(e), x -> x * 10)), Set.of(RD.type(), Choose.TYPE));
     Program<List<Integer>> outer = Handlers.reader(RD, 4, Handlers.all(e -> e.foreign(inner)));
     assertEquals(List.of(40, 50), run(outer));
   }
@@ -174,7 +175,7 @@ class StepsJavaTest {
   /** the same, the inner one answered in place by a cell here: its yields none, its state this machine's */
   @Test void importAnsweredInPlaceHere() {
     Computation<Integer> inner = M.computation(e ->
-        e.flatMap(Handlers.<Integer>modify(ST, s -> s + 1).in(e), u -> Handlers.<Integer>get(ST).in(e)), Set.of(ST));
+        e.flatMap(Handlers.<Integer>modify(ST, s -> s + 1).in(e), u -> Handlers.<Integer>get(ST).in(e)), Set.of(ST.type()));
     Results.Final<Integer, Integer> r = run(Handlers.state(ST, 41, (Effects e) -> e.foreign(inner)));
     assertEquals(new Results.Final<>(42, 42), r);
   }

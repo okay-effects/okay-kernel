@@ -8,5 +8,9 @@ package okay.kernel;
  * at once. The body's value {@code A}, the handler's answer {@code R}
  */
 public interface Handler<A, R> {
-  Type effect();
+  /** the key of the effect it handles */
+  Key<?> key();
+
+  /** the effect's exact identity */
+  default Type effect() { return key().type(); }
 }

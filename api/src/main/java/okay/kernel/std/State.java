@@ -1,25 +1,28 @@
 package okay.kernel.std;
 
+import okay.kernel.Key;
 import okay.kernel.Op;
 import okay.kernel.Same;
 import okay.kernel.Type;
 
-/** STATE: a cell, read and written */
-public final class State {
+/** STATE: a cell, read and written — {@code State<S>} the effect as a type, the phantom of its key */
+public final class State<S> {
   private State() {}
 
-  /** the state of {@code s} */
+  /** the effect's exact identity, over {@code s} */
   public static Type of(Type s) { return Type.of(State.class, s); }
 
+  /** the effect's key over {@code s}, the type of {@code S}: one for all who ask */
+  public static <S> Key<State<S>> key(Type s) { return Key.of(of(s)); }
+
   /**
-   * AN OPERATION OF THIS EFFECT, AS ONE OF ITS OPERATIONS — what a handler found by the effect's identity is given.
-   * The one trusted step of the vocabulary: an operation of the effect {@code State...} is one of {@code Ops}, its
-   * type arguments the effect's (its {@code Type} says so). Checked as far as the JVM can: not one of them, a failure
+   * AN OPERATION OF THIS EFFECT, AS ONE OF ITS OPERATIONS — what the handler of {@code key} is given: checked to be of
+   * {@code key} (the same key, by identity) and one of {@code Ops}, so its types are the key's. Not, a failure
    */
   @SuppressWarnings("unchecked")
-  public static <S, X> Ops<S, X> narrow(okay.kernel.Op<X> op) {
-    if (op instanceof State.Ops<?, ?>) return (Ops<S, X>) op;
-    throw new IllegalArgumentException("not an operation of State: " + op);
+  public static <S, X> Ops<S, X> narrow(Key<State<S>> key, Op<X> op) {
+    if (key.owns(op) && op instanceof State.Ops<?, ?>) return (Ops<S, X>) op;
+    throw new IllegalArgumentException("not an operation of " + key + ": " + op);
   }
 
   /** its operations: the kernel's records below, or an implementation's own — implementing it, its {@code fold}
@@ -34,11 +37,11 @@ public final class State {
     R put(S s, Same<Void, X> value);
   }
 
-  public record Get<S>(Type effect) implements Ops<S, S> {
+  public record Get<S>(Key<State<S>> key) implements Ops<S, S> {
     public <R> R fold(Cases<S, S, R> c) { return c.get(new Same.Refl<>()); }
   }
 
-  public record Put<S>(Type effect, S s) implements Ops<S, Void> {
+  public record Put<S>(Key<State<S>> key, S s) implements Ops<S, Void> {
     public <R> R fold(Cases<S, Void, R> c) { return c.put(s, new Same.Refl<>()); }
   }
 }

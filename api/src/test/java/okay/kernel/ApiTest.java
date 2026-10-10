@@ -25,23 +25,28 @@ class ApiTest {
   /** a cell's clause, as a handler written in Java writes it: k typed by the operation's value, no cast */
   static int cell = 1;
 
-  static <X, R> R clause(State.Ops<Integer, X> op, Fn<X, R> k) {
-    return op.fold(new State.Cases<Integer, X, R>() {
+  static final Key<State<Integer>> ST = State.key(INT);
+
+  static <X, R> R clause(Op<X> op, Fn<X, R> k) {
+    return State.narrow(ST, op).fold(new State.Cases<Integer, X, R>() {
       public R get(Same<Integer, X> value) { return k.apply(value.apply(cell)); }
       public R put(Integer s, Same<Void, X> value) { cell = s; return k.apply(value.apply(null)); }
     });
   }
 
   @Test void casesTotalAndTyped() {
-    Type st = State.of(INT);
-    assertEquals("got 1", clause(new State.Get<Integer>(st), (Integer x) -> "got " + x));
-    assertEquals("put", clause(new State.Put<>(st, 5), (Void u) -> "put"));
-    assertEquals("got 5", clause(new State.Get<Integer>(st), (Integer x) -> "got " + x));
-    assertSame(st, new State.Get<Integer>(st).effect());
+    assertEquals("got 1", clause(new State.Get<Integer>(ST), (Integer x) -> "got " + x));
+    assertEquals("put", clause(new State.Put<>(ST, 5), (Void u) -> "put"));
+    assertEquals("got 5", clause(new State.Get<Integer>(ST), (Integer x) -> "got " + x));
+    assertSame(State.of(INT), new State.Get<Integer>(ST).effect());
+    assertSame(ST, State.<Integer>key(INT), "one key a type");
+    // an operation of another key — another state's — is not this handler's: the key says so
+    Key<State<String>> other = State.key(STR);
+    assertThrows(IllegalArgumentException.class, () -> State.narrow(ST, new State.Get<String>(other)));
   }
 
   @Test void aRaiseHasNoValue() {
-    Throws.Ops<String, Integer> raise = new Throws.Raise<>(Throws.of(STR), "boom");
+    Throws.Ops<String, Integer> raise = new Throws.Raise<>(Throws.<String>key(STR), "boom");
     assertEquals("caught boom", raise.fold(new Throws.Cases<String, Integer, String>() {
       public String raise(String error) { return "caught " + error; }
     }));
@@ -52,7 +57,7 @@ class ApiTest {
     assertEquals(6, (int) among.fold(new Choose.Cases<Integer, Integer>() {
       public Integer among(List<Integer> xs) { return xs.stream().mapToInt(Integer::intValue).sum(); }
     }));
-    assertSame(Choose.TYPE, among.effect());
+    assertSame(Choose.KEY, among.key());
   }
 
   @Test void stepsAreData() {

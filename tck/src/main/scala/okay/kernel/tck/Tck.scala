@@ -13,7 +13,8 @@ import okay.kernel.std.{Choose, Handlers, Reader, Results, State, Throws, Writer
 object Tck {
   def prog[A](f: Effects => Prog[A]): Program[A] = new Program[A] { def in(e: Effects): Prog[A] = f(e) }
   def fn[A, B](f: A => B): Fn[A, B] = new Fn[A, B] { def apply(a: A): B = f(a) }
-  def set(ts: Type*): java.util.Set[Type] = { val s = new java.util.HashSet[Type](); ts.foreach(s.add); s }
+  /** a row at run time: the effects' identities, given by their keys */
+  def set(ks: Key[?]*): java.util.Set[Type] = { val s = new java.util.HashSet[Type](); ks.foreach(k => s.add(k.`type`())); s }
   def list[A](as: A*): java.util.List[A] = { val l = new java.util.ArrayList[A](); as.foreach(l.add); l }
 
   /** a program run to its value on `e`; a failure thrown; an operation with no handler, a failure */
@@ -43,9 +44,9 @@ object Tck {
   final case class ChooseH(body: T) extends T
 
   private def tag(kind: String, e: Int): Type = Type.of("okay.kernel.tck." + kind + e)
-  def writerE(e: Int): Type = Writer.of(tag("w", e))
-  def stateE(e: Int): Type = State.of(tag("s", e))
-  def throwsE(e: Int): Type = Throws.of(tag("t", e))
+  def writerE(e: Int): Key[Writer[Integer]] = Writer.key[Integer](tag("w", e))
+  def stateE(e: Int): Key[State[Integer]] = State.key[Integer](tag("s", e))
+  def throwsE(e: Int): Key[Throws[Integer]] = Throws.key[Integer](tag("t", e))
 
   def gen(r: Random, depth: Int): T =
     if (depth <= 0 || r.nextInt(4) == 0) r.nextInt(6) match {

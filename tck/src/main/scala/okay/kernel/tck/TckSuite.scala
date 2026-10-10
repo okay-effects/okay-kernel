@@ -10,9 +10,9 @@ import Tck._
  * random programs against the reference's digest
  */
 abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) extends munit.FunSuite {
-  private val st = State.of(Type.of("okay.kernel.tck.s"))
-  private val log = Writer.of(Type.of("okay.kernel.tck.w"))
-  private val rd = Reader.of(Type.of("okay.kernel.tck.r"))
+  private val st = State.key[Integer](Type.of("okay.kernel.tck.s"))
+  private val log = Writer.key[String](Type.of("okay.kernel.tck.w"))
+  private val rd = Reader.key[Integer](Type.of("okay.kernel.tck.r"))
   private val ask: Program[Integer] = Handlers.ask[Integer](rd)
   private def int(i: Int): Integer = Integer.valueOf(i)
   private def done[A](s: Step[A]): A = s match {
@@ -67,7 +67,7 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
     assertEquals(run(e, prog(x => x.recover[Integer](prog(_.failed(new RuntimeException("no"))), fn((t: Throwable) => x.pure(int(t.getMessage.length)))))).intValue, 2)
     run(e, prog(x => x.ensuring(prog(_.pure(int(1))), fin)))
     run(e, prog(x => x.recover[Integer](prog(y => y.ensuring(prog(_.failed(new RuntimeException)), fin)), fn((_: Throwable) => x.pure(int(0))))))
-    val err = okay.kernel.std.Throws.of(Type.of("okay.kernel.tck.t"))
+    val err = okay.kernel.std.Throws.key[String](Type.of("okay.kernel.tck.t"))
     run(e, Handlers.throwsOf[String, Integer](err, prog(x => x.ensuring(Handlers.raise[String, Integer](err, "boom"), fin))))
     assertEquals(fins, 3)
   }
@@ -78,8 +78,8 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
     assertEquals(done(y.k().resume(int(41))).intValue, 42)
     assertEquals(done(y.k().resume(int(1))).intValue, 2)
     val host = new Answers {
-      def answers(t: Type): Boolean = t eq rd
-      def value[X](op: Op[X]): X = Reader.narrow[Integer, X](op).fold(new Reader.Cases[Integer, X, X] { def ask(v: Same[Integer, X]): X = v(int(41)) })
+      def answers(t: Type): Boolean = t eq rd.`type`()
+      def value[X](op: Op[X]): X = Reader.narrow(rd, op).fold(new Reader.Cases[Integer, X, X] { def ask(v: Same[Integer, X]): X = v(int(41)) })
     }
     assertEquals(done(c.start(host)).intValue, 42)
     val caught = e.computation(prog(x => x.recover[Integer](ask, fn((_: Throwable) => x.pure(int(-1))))), set(rd))
@@ -111,20 +111,20 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
     val chain = (e :: others).reverse
     val innermost = inner.computation(prog { x =>
       x.flatMap(ask.in(x), fn((n: Integer) => x.map(Handlers.among[Integer](list(n, int(n + 1))).in(x), fn((v: Integer) => int(v * 10)))))
-    }, set(rd, Choose.TYPE))
-    val outer = chain.tail.foldLeft(innermost)((c, impl) => impl.computation(prog(x => x.foreign(c)), set(rd, Choose.TYPE)))
+    }, set(rd, Choose.KEY))
+    val outer = chain.tail.foldLeft(innermost)((c, impl) => impl.computation(prog(x => x.foreign(c)), set(rd, Choose.KEY)))
     assertEquals(run(e, Handlers.reader[Integer, java.util.List[Integer]](rd, int(4), Handlers.all(prog(x => x.foreign(outer))))), list(int(40), int(50)))
   }
 
   // -- where implementations went wrong: each a check of its own
 
   test(s"$name: k resumed under other handlers — an operation goes to the handler in force where it runs") {
-    val tick = Type.of("okay.kernel.tck.tick")
-    final case class Tick() extends Op[Void] { def effect(): Type = tick }
+    val tick = Key.fresh[Void]()
+    final case class Tick() extends Op[Void] { def key(): Key[?] = tick }
     val body = prog(x => x.flatMap(x.perform(Tick()), fn((_: Void) => ask.in(x))))
     // the clause resumes k under a reader of its own: the ask, in k, finds that one
     val h = new General[Integer, Integer] {
-      def effect(): Type = tick
+      def key(): Key[?] = tick
       def ret(a: Integer, x: Effects): Prog[Integer] = x.pure(a)
       def apply[X](op: Op[X], k: Fn[X, Prog[Integer]], x: Effects): Prog[Integer] =
         Handlers.reader[Integer, Integer](rd, int(2), prog(_ => k(null.asInstanceOf[X]))).in(x)
@@ -142,9 +142,9 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
   }
 
   test(s"$name: a failure of a handler's answer is the program's, caught by recover") {
-    val none = Type.of("okay.kernel.tck.none")
+    val none = Key.fresh[Void]()
     val h = new Returning[Integer, Integer] {
-      def effect(): Type = none
+      def key(): Key[?] = none
       def answer(a: Integer): Integer = throw new IllegalStateException("answer")
     }
     assertEquals(run(e, prog(x => x.recover[Integer](prog(_.handle(h, prog(_.pure(int(1))))), fn((_: Throwable) => x.pure(int(7)))))).intValue, 7)
@@ -158,7 +158,7 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
   }
 
   test(s"$name: a foreign program ended by an abort crossing it — its finalizers run, their operations answered here") {
-    val err = okay.kernel.std.Throws.of(Type.of("okay.kernel.tck.t2"))
+    val err = okay.kernel.std.Throws.key[String](Type.of("okay.kernel.tck.t2"))
     val inner = e.computation(prog(x => x.ensuring(Handlers.raise[String, Integer](err, "stop"), Handlers.tell[String](log, "fin"))), set(err, log))
     val p = Handlers.writer[String, Results.Result[String, Integer]](log, Handlers.throwsOf[String, Integer](err, prog(x => x.foreign(inner))))
     val r = run(e, p)
@@ -167,16 +167,16 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
 
   // -- effects from effects: one's own effect translated to another, hidden inside, intercepted
 
-  private val auditT = Type.of("okay.kernel.tck.audit")
-  private val ticketT = Type.of("okay.kernel.tck.ticket")
+  private val auditT = Key.of[AuditOps[?]](Type.of("okay.kernel.tck.audit"))
+  private val ticketT = Key.of[Next](Type.of("okay.kernel.tck.ticket"))
   /** one's own effect, its cases as a visitor: a translation total and typed, as a handler in Java or Scala 2 writes it */
   private sealed trait AuditOps[X] extends Op[X] { def fold[R](c: AuditCases[X, R]): R }
   private trait AuditCases[X, R] { def note(s: String, v: Same[Void, X]): R }
   private final case class Note(s: String) extends AuditOps[Void] {
-    def effect(): Type = auditT
+    def key(): Key[?] = auditT
     def fold[R](c: AuditCases[Void, R]): R = c.note(s, new Same.Refl[Void]())
   }
-  private final case class Next() extends Op[Integer] { def effect(): Type = ticketT }
+  private final case class Next() extends Op[Integer] { def key(): Key[?] = ticketT }
   // an operation of the effect found by its identity, as one of its family: the test's one trusted step, as the
   // vocabulary's `narrow`
   private def audit[X](op: Op[X]): AuditOps[X] = op match { case a: AuditOps[X @unchecked] => a }
@@ -199,7 +199,7 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
   }
 
   test(s"$name: one's effect on another installed inside, hidden — a fresh identity; the caller's own untouched") {
-    val hidden = Type.fresh()
+    val hidden = Key.fresh[State[Integer]]()
     def tickets[A](body: Program[A]): Program[Results.Final[Integer, A]] =
       Handlers.state[Integer, A](hidden, int(0), Handlers.translate[A](ticketT, new Handlers.Translation {
         def apply[X](op: Op[X]): Program[X] = op match {
@@ -215,12 +215,12 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
 
   test(s"$name: interceptors — what an effect does in a body changed, nested, the clause's own operations outward") {
     def times(n: Int) = new Handlers.Translation {
-      def apply[X](op: Op[X]): Program[X] = Reader.narrow[Integer, X](op).fold(new Reader.Cases[Integer, X, Program[X]] {
+      def apply[X](op: Op[X]): Program[X] = Reader.narrow(rd, op).fold(new Reader.Cases[Integer, X, Program[X]] {
         def ask(v: Same[Integer, X]): Program[X] = prog(x => x.map(Handlers.ask[Integer](rd).in(x), fn((r: Integer) => v(int(r * n)))))
       })
     }
     def plus(n: Int) = new Handlers.Translation {
-      def apply[X](op: Op[X]): Program[X] = Reader.narrow[Integer, X](op).fold(new Reader.Cases[Integer, X, Program[X]] {
+      def apply[X](op: Op[X]): Program[X] = Reader.narrow(rd, op).fold(new Reader.Cases[Integer, X, Program[X]] {
         def ask(v: Same[Integer, X]): Program[X] = prog(x => x.map(Handlers.ask[Integer](rd).in(x), fn((r: Integer) => v(int(r + n)))))
       })
     }

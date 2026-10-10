@@ -45,6 +45,20 @@ int id()                // dense: a machine's array of handlers in force, by eff
   transparent).
 - Prototypes: `docs/prototypes/Types3.scala`, `Types2.scala`.
 
+### The typed key
+
+`Key<F>` is what operations and handlers carry: the effect as a type (`Key<State<Integer>>`), one a `Type`, interned.
+A handler found by an operation's key is the operation's own: `State.narrow(key, op)` checks the key by identity, so
+the operation's types are the key's. The Java of `Class<T>` in a typesafe heterogeneous container: a key cannot be had
+at a type it is not, without a cast in one's own code.
+
+Why a key and not a proof at compile time: an operation and its handler compiled apart — two languages, two
+libraries — meet only at run time, by a value; a compiler cannot turn the equality of two values into the equality of
+two types (Java's `Class.cast`, Haskell's `Typeable`/`eqT` meet the same). So the kernel's one trusted step is in
+`Key.of`: a key asked for at `F` by its type is the one made for that type — sound as long as a `Type` names one type
+(the exact types of `TypeOf`; a name of one's own, a string, given to one type only). Inside one implementation there
+is no cast at all (rows and paths, okay-zero); at the border a foreign program's row is checked once (`effects()`).
+
 ## 3. The protocol
 
 ```java

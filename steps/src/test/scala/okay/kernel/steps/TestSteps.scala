@@ -9,15 +9,15 @@ import okay.kernel.types.typeOf
  * protocol — export, import, multi-shot k */
 class TestSteps extends FunSuite {
   val e: Effects = Steps
-  val st: Type = State.of(typeOf[Integer])
-  val log: Type = okay.kernel.std.Writer.of(typeOf[String])
-  val err: Type = okay.kernel.std.Throws.of(typeOf[String])
-  val rd: Type = okay.kernel.std.Reader.of(typeOf[Integer])
+  val st: Key[State[Integer]] = State.key[Integer](typeOf[Integer])
+  val log: Key[okay.kernel.std.Writer[String]] = okay.kernel.std.Writer.key[String](typeOf[String])
+  val err: Key[okay.kernel.std.Throws[String]] = okay.kernel.std.Throws.key[String](typeOf[String])
+  val rd: Key[okay.kernel.std.Reader[Integer]] = okay.kernel.std.Reader.key[Integer](typeOf[Integer])
 
   def prog[A](f: Effects => Prog[A]): Program[A] = new Program[A] { def in(e: Effects): Prog[A] = f(e) }
   def fn[A, B](f: A => B): Fn[A, B] = new Fn[A, B] { def apply(a: A): B = f(a) }
   def run[A](p: Program[A]): A = Steps.run(p)
-  def set(ts: Type*): java.util.Set[Type] = { val s = new java.util.HashSet[Type](); ts.foreach(s.add); s }
+  def set(ks: Key[?]*): java.util.Set[Type] = { val s = new java.util.HashSet[Type](); ks.foreach(k => s.add(k.`type`())); s }
   /** a row as Scala's set: java.util's equals of sets (containsAll) fails on Scala Native under Scala 3 */
   def elems(s: java.util.Set[Type]): Set[Type] = { val b = Set.newBuilder[Type]; val i = s.iterator(); while (i.hasNext) b += i.next(); b.result() }
 
@@ -68,7 +68,7 @@ class TestSteps extends FunSuite {
   }
 
   test("a generator: values pulled one by one") {
-    val em = okay.kernel.std.Emit.of(typeOf[Integer])
+    val em = okay.kernel.std.Emit.key[Integer](typeOf[Integer])
     val three = prog { e =>
       e.flatMap(Handlers.send[Integer](em, 1).in(e), fn((_: Void) => e.flatMap(Handlers.send[Integer](em, 2).in(e), fn((_: Void) => e.pure("done")))))
     }
@@ -95,14 +95,14 @@ class TestSteps extends FunSuite {
         val k = y.k().asInstanceOf[Resume[Integer, Integer]]
         assertEquals(k.resume(41).asInstanceOf[Step.Done[Integer]].value().intValue, 42)
         assertEquals(k.resume(1).asInstanceOf[Step.Done[Integer]].value().intValue, 2)
-        assertEquals(elems(c.effects()), Set(rd))
+        assertEquals(elems(c.effects()), Set(rd.`type`()))
       case s => fail(s"expected a yield: $s")
     }
   }
 
   test("export: answered in place by the host, no yield") {
     val host = new Answers {
-      def answers(t: Type): Boolean = t eq rd
+      def answers(t: Type): Boolean = t eq rd.`type`()
       def value[X](op: Op[X]): X = Integer.valueOf(41).asInstanceOf[X]
     }
     val c = Steps.computation(prog(e => e.map(ask.in(e), fn((n: Integer) => Integer.valueOf(n + 1)))), set(rd))
@@ -130,7 +130,7 @@ class TestSteps extends FunSuite {
   test("import: another's program under this one's handlers — in place and by k") {
     val inner = Steps.computation(prog { e =>
       e.flatMap(ask.in(e), fn((n: Integer) => e.map(Handlers.among[Integer](java.util.Arrays.asList(n, n + 1)).in(e), fn((x: Integer) => Integer.valueOf(x * 10)))))
-    }, set(rd, okay.kernel.std.Choose.TYPE))
+    }, set(rd, okay.kernel.std.Choose.KEY))
     val outer = Handlers.reader[Integer, java.util.List[Integer]](rd, 4, Handlers.all(prog(e => e.foreign(inner))))
     assertEquals(run(outer), java.util.Arrays.asList[Integer](40, 50))
   }
