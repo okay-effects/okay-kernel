@@ -39,15 +39,29 @@ trait Callback[-A]:
 
 /** the handlers, values: any language installs them on any monad */
 object Handlers:
-  /** the body's value with its log, each tell in front of the rest's */
-  def writer(e: Effect): Handler = new Handler:
+  // the handlers made, by effect: a map replaced whole when one is added, read with no lock — every platform
+  @volatile private var made = Map.empty[(Effect, Int), Handler]
+  private def once(e: Effect, kind: Int, make: => Handler): Handler =
+    made.get((e, kind)) match
+      case Some(h) => h
+      case None => synchronized {
+        made.get((e, kind)) match
+          case Some(h) => h
+          case None => val h = make; made = made.updated((e, kind), h); h
+      }
+
+  /** the body's value with its log, each tell in front of the rest's: one a log's effect */
+  def writer(e: Effect): Handler = once(e, 0, writerOf(e))
+  /** the body's value a `Right`, a raise's a `Left`: one a failure's effect */
+  def throws(e: Effect): Handler = once(e, 1, throwsOf(e))
+
+  private def writerOf(e: Effect): Handler = new Handler:
     def effect: Effect = e
     def ret(a: Any, m: Monad): Any = m.pure((Nil, a))
     def apply(op: Op[?], k: Fn[Any, Any], m: Monad): Any = op match
       case Tell(w, _) => m.map(k(()), { case (log: List[Any] @unchecked, a) => (w :: log, a) })
 
-  /** the body's value a `Right`, a raise's a `Left` */
-  def throws(e: Effect): Handler = new Handler:
+  private def throwsOf(e: Effect): Handler = new Handler:
     def effect: Effect = e
     def ret(a: Any, m: Monad): Any = m.pure(Right(a))
     def apply(op: Op[?], k: Fn[Any, Any], m: Monad): Any = op match
@@ -152,19 +166,23 @@ trait State[S]
 trait Choose
 trait Async
 
-def tell[W](w: W)(using t: Tag[W]): Unit ! Writer % W = Eff.perform(Tell(w, Effects.writer(t.name)))
+private def writerE(t: Tag[?]): Effect = t.effect(Tag.Writer, Effects.writer)
+private def throwsE(t: Tag[?]): Effect = t.effect(Tag.Throws, Effects.throws)
+private def stateE(t: Tag[?]): Effect = t.effect(Tag.State, Effects.state)
+
+def tell[W](w: W)(using t: Tag[W]): Unit ! Writer % W = Eff.perform(Tell(w, writerE(t)))
 def writer[W, R, A](p: A ! (Writer[W] & R))(using t: Tag[W]): (List[W], A) ! R =
-  Eff.handle(Handlers.writer(Effects.writer(t.name)), p)
+  Eff.handle(t.handler(Tag.Writer, Handlers.writer(writerE(t))), p)
 
-def raise[E](e: E)(using t: Tag[E]): Nothing ! Throws % E = Eff.perform(Raise(e, Effects.throws(t.name)))
+def raise[E](e: E)(using t: Tag[E]): Nothing ! Throws % E = Eff.perform(Raise(e, throwsE(t)))
 def attempt[E, R, A](p: A ! (Throws[E] & R))(using t: Tag[E]): Either[E, A] ! R =
-  Eff.handle(Handlers.throws(Effects.throws(t.name)), p)
+  Eff.handle(t.handler(Tag.Throws, Handlers.throws(throwsE(t))), p)
 
-def get[S](using t: Tag[S]): S ! State % S = Eff.perform(Get(Effects.state(t.name)))
-def put[S](s: S)(using t: Tag[S]): Unit ! State % S = Eff.perform(Put(s, Effects.state(t.name)))
+def get[S](using t: Tag[S]): S ! State % S = Eff.perform(Get(stateE(t)))
+def put[S](s: S)(using t: Tag[S]): Unit ! State % S = Eff.perform(Put(s, stateE(t)))
 /** a state of a cell, one a run */
 def state[S, R, A](s0: S, p: A ! (State[S] & R))(using t: Tag[S]): (S, A) ! R =
-  Eff.from[R, (S, A)](m => m.handle(Handlers.state(Effects.state(t.name), s0), p))
+  Eff.from[R, (S, A)](m => m.handle(Handlers.state(stateE(t), s0), p))
 
 def among[A](as: Seq[A]): A ! Choose = Eff.perform(Among(as))
 def choose[R, A](p: A ! (Choose & R)): List[A] ! R = Eff.handle(Handlers.choose, p)

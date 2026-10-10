@@ -22,11 +22,20 @@ final class OnCore private (val c: Effects, effs: List[Effect], top: CoreTop) ex
   override def map(p: Any, f: Fn[Any, Any]): Any = c.map(prog(p))(a => f(a))
   def delay(p: Thunk[Any]): Any = c.delay[Any, Any, Any](prog(p.get()))
 
+  // the paths found in this context, by effect: a loop's operations find theirs once
+  private var lastEffect: Effect = null
+  private var lastPath: In[?, ?] = null
+
   def perform(op: Op[?]): Any =
-    val i = effs.indexWhere(_ eq op.effect)
-    if i < 0 then throw IllegalStateException(s"an operation of ${op.effect} with no handler of it in force")
-    var in: In[?, ?] = In.Here()
-    for _ <- 0 until i do in = In.There(in.asInstanceOf[In[Dyn, okay.core.Row]])
+    val e = op.effect
+    val in = if e eq lastEffect then lastPath else
+      val i = effs.indexWhere(_ eq e)
+      if i < 0 then throw IllegalStateException(s"an operation of $e with no handler of it in force")
+      var path: In[?, ?] = In.Here()
+      for _ <- 0 until i do path = In.There(path.asInstanceOf[In[Dyn, okay.core.Row]])
+      lastEffect = e
+      lastPath = path
+      path
     c.perform[Dyn, Any, Any](Dyn(op.asInstanceOf[Op[Any]]), in.asInstanceOf[In[Dyn, c.Effs]])
 
   def handle(h: Handler, body: Program[?]): Any =
