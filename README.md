@@ -24,6 +24,7 @@ written in any other. The monad changes nothing a program sees, only the speed.
 | `Op[X]`, `Effect` | an operation as data, of value `X`, of an effect by identity |
 | `Handler[A, R]` | `ret(a: A, m): Prog[R]`, and the clause `apply[X](op: Op[X], k: Fn[X, Prog[R]], m): Prog[R]` — `k` typed by the operation's value, the rest up to the handler, deep, any number of times |
 | `Answering[A, R]` | `value[X](op: Op[X]): X`: each clause `k(value(op))`, answered in place |
+| `Returning[A, R]` | `answer(a: A): R`: `ret` a value, `m.pure(answer(a))` — a monad may take the value itself, no program made for it (`OnCore`: okay-core's own handler, nothing flattened) |
 | `Monad` | `pure[A]`, `flatMap[A, B]`, `map`, `delay`, `perform[X](op: Op[X]): Prog[X]`, `handle[A, R](h: Handler[A, R], body: Program[A]): Prog[R]`, `run[A](p: Prog[A]): A` |
 | `Fn`, `Thunk`, `Sink` | single-abstract-method traits: a lambda of any of the languages |
 

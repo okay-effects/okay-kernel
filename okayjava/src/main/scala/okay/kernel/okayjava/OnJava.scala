@@ -1,7 +1,7 @@
 package okay.kernel.okayjava
 
 import okay.core.{Eff, Prompt}
-import okay.kernel.{Answering, Effect, Fn, Handler, Monad, Op, Prog, Program, Thunk}
+import okay.kernel.{Answering, Effect, Fn, Handler, Monad, Op, Prog, Program, Returning, Thunk}
 
 /**
  * A MONAD OF THE KERNEL ON OKAY-JAVA: its programs okay-java's `Eff`, run by its machine — the prompts' one. A kernel
@@ -23,17 +23,13 @@ final class OnJava private (inForce: List[OnJava.InForce]) extends Monad:
   override def map[A, B](p: Prog[A], f: Fn[A, B]): Prog[B] = wrap(prog(p).map[Any](a => f(a.asInstanceOf[A])))
   def delay[A](p: Thunk[Prog[A]]): Prog[A] = wrap(Eff.delay[Any, Any](() => prog(p.get())))
 
-  // the handler found last, by effect: a loop's operations find theirs once
-  private var lastEffect: Effect = null
-  private var last: OnJava.InForce = null
-
   def perform[X](op: Op[X]): Prog[X] =
     val e = op.effect
-    val f = if e eq lastEffect then last else
-      val found = inForce.find(_.effect eq e).getOrElse(throw IllegalStateException(s"an operation of $e with no handler of it in force"))
-      lastEffect = e
-      last = found
-      found
+    // the nearest handler of the effect, by identity, innermost first
+    var rest = inForce
+    while rest.nonEmpty && (rest.head.effect ne e) do rest = rest.tail
+    if rest.isEmpty then throw IllegalStateException(s"an operation of $e with no handler of it in force")
+    val f = rest.head
     f.handler match
       case a: Answering[?, ?] => wrap(Eff.sync[Any, X](() => a.value(op)))
       case h => wrap(f.prompt.shift0[X](k => f.outer.clause(h, op, k)))
@@ -50,7 +46,10 @@ final class OnJava private (inForce: List[OnJava.InForce]) extends Monad:
           val inside = OnJava(OnJava.InForce(h.effect, h, p.asInstanceOf[Prompt[Any, Any, Any]], outer) :: inForce)
           prog(body.in(inside)).asInstanceOf[Eff[M, Any]]
       ,
-      a => prog(h.ret(a.asInstanceOf[A], outer))))
+      // a return that is a value: no program built in the kernel's terms and taken apart
+      h match
+        case r: Returning[A, R] @unchecked => a => Eff.pure[Any, Any](r.answer(a.asInstanceOf[A]))
+        case _ => a => prog(h.ret(a.asInstanceOf[A], outer))))
 
   def run[A](p: Prog[A]): A = Eff.run[A](prog(p).asInstanceOf[Eff[Eff.Top, A]])
 

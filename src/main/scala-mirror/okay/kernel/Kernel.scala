@@ -83,6 +83,12 @@ trait Answering[A, R] extends Handler[A, R]:
   def value[X](op: Op[X]): X
   def apply[X](op: Op[X], k: Fn[X, Prog[R]], m: Monad): Prog[R] = k(value(op))
 
+/** a handler whose RETURN IS A VALUE, no program: `ret(a, m)` is `m.pure(answer(a))` — so a monad may take the value
+ * itself, no program made and run for it */
+trait Returning[A, R] extends Handler[A, R]:
+  def answer(a: A): R
+  def ret(a: A, m: Monad): Prog[R] = m.pure(answer(a))
+
 /** A MONAD: an implementation of the kernel — its programs, and their run */
 trait Monad:
   def pure[A](a: A): Prog[A]

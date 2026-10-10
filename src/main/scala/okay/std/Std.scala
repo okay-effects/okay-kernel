@@ -1,7 +1,7 @@
 package okay.std
 
 import okay.{!, %, Eff, Tag}
-import okay.kernel.{Answering, Effect, Fn, Handler, Monad, Op, Prog, Program, Sink, Thunk}
+import okay.kernel.{Answering, Effect, Fn, Handler, Monad, Op, Prog, Program, Returning, Sink, Thunk}
 import okay.kernel.std.{Among, Await, Callback, Effects, Get, Put, Raise, Tell}
 
 // THE STANDARD EFFECTS: their data — effects, operations, answers — the API's, `okay.kernel.std`, one class each for
@@ -24,35 +24,35 @@ object Handlers:
   /** the body's value with its log, each tell in front of the rest's */
   def writer[W, A](e: Effect): Handler[A, (List[W], A)] =
     once(e, 0, writerOf[Any, Any](e)).asInstanceOf[Handler[A, (List[W], A)]]
-  private def writerOf[W, A](e: Effect): Handler[A, (List[W], A)] = new Handler[A, (List[W], A)]:
+  private def writerOf[W, A](e: Effect): Handler[A, (List[W], A)] = new Returning[A, (List[W], A)]:
     def effect: Effect = e
-    def ret(a: A, m: Monad): Prog[(List[W], A)] = m.pure((Nil, a))
+    def answer(a: A): (List[W], A) = (Nil, a)
     def apply[X](op: Op[X], k: Fn[X, Prog[(List[W], A)]], m: Monad): Prog[(List[W], A)] = op match
       case t: Tell[?] => m.map(k(null.asInstanceOf[X]), (log, a) => (t.w.asInstanceOf[W] :: log, a))
 
   /** the body's value a `Right`, a raise's a `Left` */
   def throws[E, A](e: Effect): Handler[A, Either[E, A]] =
     once(e, 1, throwsOf[Any, Any](e)).asInstanceOf[Handler[A, Either[E, A]]]
-  private def throwsOf[E, A](e: Effect): Handler[A, Either[E, A]] = new Handler[A, Either[E, A]]:
+  private def throwsOf[E, A](e: Effect): Handler[A, Either[E, A]] = new Returning[A, Either[E, A]]:
     def effect: Effect = e
-    def ret(a: A, m: Monad): Prog[Either[E, A]] = m.pure(Right(a))
+    def answer(a: A): Either[E, A] = Right(a)
     def apply[X](op: Op[X], k: Fn[X, Prog[Either[E, A]]], m: Monad): Prog[Either[E, A]] = op match
       case r: Raise[?, ?] => m.pure(Left(r.error.asInstanceOf[E]))
 
   /** a cell, one a run of the handler: the final state with the value */
-  def state[S, A](e: Effect, s0: S): Handler[A, (S, A)] = new Answering[A, (S, A)]:
+  def state[S, A](e: Effect, s0: S): Handler[A, (S, A)] = new Answering[A, (S, A)] with Returning[A, (S, A)]:
     private var s: S = s0
     def effect: Effect = e
-    def ret(a: A, m: Monad): Prog[(S, A)] = m.pure((s, a))
+    def answer(a: A): (S, A) = (s, a)
     def value[X](op: Op[X]): X = op match
       case p: Put[?] => s = p.s.asInstanceOf[S]; null.asInstanceOf[X]
       case _ => s.asInstanceOf[X]
 
   /** every value the body comes to, a list, one a path through its choices */
   def choose[A]: Handler[A, List[A]] = chooseAll.asInstanceOf[Handler[A, List[A]]]
-  private val chooseAll: Handler[Any, List[Any]] = new Handler[Any, List[Any]]:
+  private val chooseAll: Handler[Any, List[Any]] = new Returning[Any, List[Any]]:
     def effect: Effect = Effects.CHOOSE
-    def ret(a: Any, m: Monad): Prog[List[Any]] = m.pure(List(a))
+    def answer(a: Any): List[Any] = List(a)
     def apply[X](op: Op[X], k: Fn[X, Prog[List[Any]]], m: Monad): Prog[List[Any]] = op match
       case c: Among[X @unchecked] =>
         val as = c.as
@@ -63,9 +63,9 @@ object Handlers:
 
   /** the first value the body comes to, its choices tried in order, the rest not tried */
   def first[A]: Handler[A, Option[A]] = chooseFirst.asInstanceOf[Handler[A, Option[A]]]
-  private val chooseFirst: Handler[Any, Option[Any]] = new Handler[Any, Option[Any]]:
+  private val chooseFirst: Handler[Any, Option[Any]] = new Returning[Any, Option[Any]]:
     def effect: Effect = Effects.CHOOSE
-    def ret(a: Any, m: Monad): Prog[Option[Any]] = m.pure(Some(a))
+    def answer(a: Any): Option[Any] = Some(a)
     def apply[X](op: Op[X], k: Fn[X, Prog[Option[Any]]], m: Monad): Prog[Option[Any]] = op match
       case c: Among[X @unchecked] =>
         val as = c.as

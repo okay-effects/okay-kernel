@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import okay.kernel.Answering;
+import okay.kernel.Returning;
 import okay.kernel.Effect;
 import okay.kernel.Fn;
 import okay.kernel.Handler;
@@ -21,9 +22,9 @@ public final class Handlers {
 
   /** the body's value with its log, each tell in front of the rest's */
   public static <W, A> Handler<A, Logged<W, A>> writer(Effect e) {
-    return new Handler<>() {
+    return new Returning<>() {
       public Effect effect() { return e; }
-      public Prog<Logged<W, A>> ret(A a, Monad m) { return m.pure(Logged.of(a)); }
+      public Logged<W, A> answer(A a) { return Logged.of(a); }
       public <X> Prog<Logged<W, A>> apply(Op<X> op, Fn<X, Prog<Logged<W, A>>> k, Monad m) {
         W w = ((Tell<W>) op).w();
         return m.map(k.apply(null), l -> l.told(w));
@@ -33,9 +34,9 @@ public final class Handlers {
 
   /** the body's value an {@code Ok}, a raise's a {@code Failed} */
   public static <E, A> Handler<A, Result<E, A>> throwsOf(Effect e) {
-    return new Handler<>() {
+    return new Returning<>() {
       public Effect effect() { return e; }
-      public Prog<Result<E, A>> ret(A a, Monad m) { return m.pure(Result.ok(a)); }
+      public Result<E, A> answer(A a) { return Result.ok(a); }
       public <X> Prog<Result<E, A>> apply(Op<X> op, Fn<X, Prog<Result<E, A>>> k, Monad m) {
         return m.pure(Result.failed(((Raise<E, X>) op).error()));
       }
@@ -60,9 +61,9 @@ public final class Handlers {
 
   /** every value the body comes to, one a path through its choices */
   public static <A> Handler<A, List<A>> choose() {
-    return new Handler<>() {
+    return new Returning<>() {
       public Effect effect() { return Effects.CHOOSE; }
-      public Prog<List<A>> ret(A a, Monad m) { return m.pure(List.of(a)); }
+      public List<A> answer(A a) { return List.of(a); }
       public <X> Prog<List<A>> apply(Op<X> op, Fn<X, Prog<List<A>>> k, Monad m) {
         return from(((Among<X>) op).as(), 0, new ArrayList<>(), k, m);
       }
@@ -79,9 +80,9 @@ public final class Handlers {
 
   /** the first value the body comes to, its choices tried in order, the rest not tried */
   public static <A> Handler<A, Optional<A>> first() {
-    return new Handler<>() {
+    return new Returning<>() {
       public Effect effect() { return Effects.CHOOSE; }
-      public Prog<Optional<A>> ret(A a, Monad m) { return m.pure(Optional.of(a)); }
+      public Optional<A> answer(A a) { return Optional.of(a); }
       public <X> Prog<Optional<A>> apply(Op<X> op, Fn<X, Prog<Optional<A>>> k, Monad m) {
         return from(((Among<X>) op).as(), 0, k, m);
       }
@@ -95,9 +96,9 @@ public final class Handlers {
   /** awaits answered at once only — a callback called by its registration. One called later needs the run's top,
    * {@code Async.start} */
   public static <A> Handler<A, A> async() {
-    return new Handler<>() {
+    return new Returning<>() {
       public Effect effect() { return Effects.ASYNC; }
-      public Prog<A> ret(A a, Monad m) { return m.pure(a); }
+      public A answer(A a) { return a; }
       public <X> Prog<A> apply(Op<X> op, Fn<X, Prog<A>> k, Monad m) {
         Async.Cell<X> cell = new Async.Cell<>();
         ((Await<X>) op).register().accept(cell);
