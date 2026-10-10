@@ -12,7 +12,9 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test
   )
   .jvmSettings(
-    Test / unmanagedSourceDirectories += baseDirectory.value.getParentFile / "src" / "test" / "scala-jvm"
+    Test / unmanagedSourceDirectories += baseDirectory.value.getParentFile / "src" / "test" / "scala-jvm",
+    // forked: Java's compiler in the tests (`Javac`) given the test's classpath as `java.class.path`
+    Test / fork := true
   )
 
 /** Scala 3's stdlib for the Scala 2.13 project, resolved here and placed BEHIND 2.13's by hand */
