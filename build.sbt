@@ -1,6 +1,6 @@
 ThisBuild / scalaVersion := "3.9.0"
 ThisBuild / organization := "dev.okay"
-ThisBuild / version := "0.1.0-SNAPSHOT"
+ThisBuild / version := "0.2.0-SNAPSHOT"
 // okay-core and okay-java, the libraries the kernel adapts, published locally (okay-core: `sbt coreJVM/publishLocal`;
 // okay-java: `./gradlew publishToMavenLocal`, to ~/.m2)
 ThisBuild / resolvers += Resolver.mavenLocal
