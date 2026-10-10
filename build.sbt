@@ -40,4 +40,5 @@ lazy val scala2 = (project in file("scala2"))
 
 lazy val root = (project in file("."))
   .aggregate(core.jvm, core.js, core.native, scala2)
-  .settings(publish / skip := true)
+  // the aggregate only: the sources are the cross-project's
+  .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
