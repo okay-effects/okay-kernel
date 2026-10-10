@@ -2,7 +2,7 @@ package okay.kernel.onokay
 
 import okay.cont.{At, Cont, Machine}
 import okay.kernel.{Aborting, Answering, Answers, Computation, Effects, Fn, General, Handler, Op, Prog, Program, Resume,
-  Returning, Step, Thunk, Type}
+  Returning, Step, Thunk, Translating, Type}
 import scala.util.control.NonFatal
 
 /**
@@ -200,6 +200,9 @@ object OnOkay extends Effects:
           case a: Answering[?, ?] => k(try a.value(trust[Op[Any]](p.op)) catch case NonFatal(e) => FailSig(e))
           case a: Aborting[?, ?] =>
             k(try AbortSig(this, trust[Aborting[Any, Any]](a).abort(trust[Op[Any]](p.op))) catch case NonFatal(e) => FailSig(e))
+          case t: Translating[?, ?] =>
+            // its program in the handler's place, the rest then resumed with its value: no k given to code
+            bind(built(trust[Translating[Any, Any]](t).translate(trust[Op[Any]](p.op))), v => k(v))
           case g: General[?, ?] => guard(trust[General[Any, Any]](g).apply[Any](trust[Op[Any]](p.op), x => P(k(x)), OnOkay))
           case _ => k(FailSig(IllegalStateException(s"a handler of no shape: $h")))
       case s: Shift => guard(s.body.apply(x => P(again(s.k)(x))))

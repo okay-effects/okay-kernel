@@ -9,10 +9,12 @@ import okay.kernel.tck.Tck.{fn, list, prog, set}
 /** okay's own programs, in okay's words, under the kernel's handlers of any implementation; the kernel's programs
  * under okay's handlers */
 class TestOkayPrograms extends munit.FunSuite:
-  private val st = KState.of(Type.of("okay.kernel.onokay.s"))
-  private val log = KWriter.of(Type.of("okay.kernel.onokay.w"))
-  private val err = KThrows.of(Type.of("okay.kernel.onokay.t"))
-  given stateM: Mapping[State % Int] = Mapping.state[Int](st)
+  private val stT = Type.of("okay.kernel.onokay.s")
+  // one effect, seen at Scala's Int by okay and at Integer by the kernel's std: one key at run time (Int is boxed)
+  private val st = KState.key[Integer](stT)
+  private val log = KWriter.key[String](Type.of("okay.kernel.onokay.w"))
+  private val err = KThrows.key[String](Type.of("okay.kernel.onokay.t"))
+  given stateM: Mapping[State % Int] = Mapping.state[Int](KState.key[Int](stT))
   given writerM: Mapping[Writer % String] = Mapping.writer[String](log)
   given chooseM: Mapping[Choose] = Mapping.choose
   given throwsM: Mapping[Throws % String] = Mapping.throws[String](err)
@@ -56,7 +58,7 @@ class TestOkayPrograms extends munit.FunSuite:
 
   test("EXPORT: okay's program, a computation, under the reference machines' standard handlers") {
     val c = OkayPrograms.exported(okayProgram)
-    assertEquals(c.effects(), set(st, log, okay.kernel.std.Choose.TYPE))
+    assertEquals(c.effects(), set(st, log, okay.kernel.std.Choose.KEY))
     for e <- List[Effects](Steps, StepsJava.INSTANCE) do
       assertEquals(run(e, underKernel(prog(_.foreign(c)))).toString, kernelAnswer.toString)
   }
@@ -83,7 +85,7 @@ class TestOkayPrograms extends munit.FunSuite:
 
   test("IMPORT: the kernel's program, computed by the reference machine, under okay's handlers") {
     for e <- List[Effects](Steps, StepsJava.INSTANCE, OnOkay) do
-      val c = e.computation(prog(x => x.map(kernelProgram.in(x), fn((i: Integer) => i.intValue))), set(st, log, okay.kernel.std.Choose.TYPE))
+      val c = e.computation(prog(x => x.map(kernelProgram.in(x), fn((i: Integer) => i.intValue))), set(st, log, okay.kernel.std.Choose.KEY))
       assertEquals(underOkay(OkayPrograms.imported[R, Int](c)), okayAnswer)
   }
 

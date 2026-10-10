@@ -1,7 +1,7 @@
 package okay.kernel.onokay
 
 import okay.cont.{Cap, Clause, Cont, Ctx, Free, Has, In, Member, Pure, Reach, Reaches, Root, Row, Target, +:}
-import okay.kernel.{Answers, Computation, Op, Program, Resume, Same, Step, Type}
+import okay.kernel.{Answers, Computation, Key, Op, Program, Resume, Same, Step, Type}
 import okay.kernel.std.{Choose as KChoose, Reader as KReader, State as KState, Throws as KThrows, Writer as KWriter}
 import OnOkay.{FailSig, Perform, U, answered, bind, delimit, level, pureU, trust, unwind}
 import scala.jdk.CollectionConverters.*
@@ -26,9 +26,9 @@ final class Okayed[E[+_], X](val op: E[X], val back: X => Any)
 object Mapping:
   import okay.cont.{Choose, Reader, State, Throws, Writer}
 
-  /** okay's `State % S` as the kernel's state of the type `t` (`okay.kernel.std.State.of(tag)`) */
-  def state[S](t: Type): Mapping[[X] =>> State[S, X]] = new Mapping[[X] =>> State[S, X]]:
-    def effect: Type = t
+  /** okay's `State % S` as the kernel's state of the key `t` (`okay.kernel.std.State.key(tag)`) */
+  def state[S](t: Key[KState[S]]): Mapping[[X] =>> State[S, X]] = new Mapping[[X] =>> State[S, X]]:
+    def effect: Type = t.`type`()
     def toKernel[X](op: State[S, X]): Op[?] = op match
       case State.Get() => new KState.Get[S](t)
       case State.Put(s) => new KState.Put[S](t, s)
@@ -36,48 +36,48 @@ object Mapping:
       case State.Get() => trust[X](v)
       case State.Put(_) => ()
     def fromKernel(op: Op[?]): Okayed[[X] =>> State[S, X], ?] =
-      KState.narrow[S, Any](trust[Op[Any]](op)).fold(new KState.Cases[S, Any, Okayed[[X] =>> State[S, X], ?]]:
+      KState.narrow(t, trust[Op[Any]](op)).fold(new KState.Cases[S, Any, Okayed[[X] =>> State[S, X], ?]]:
         def get(v: Same[S, Any]) = Okayed[[X] =>> State[S, X], S](State.Get[S](), s => s)
         def put(s: S, v: Same[Void, Any]) = Okayed[[X] =>> State[S, X], Unit](State.Put(s), _ => null))
 
-  /** okay's `Reader % R` as the kernel's reader of the type `t`; `asks(f)` an ask, `f` applied here */
-  def reader[R](t: Type): Mapping[[X] =>> Reader[R, X]] = new Mapping[[X] =>> Reader[R, X]]:
-    def effect: Type = t
+  /** okay's `Reader % R` as the kernel's reader of the key `t`; `asks(f)` an ask, `f` applied here */
+  def reader[R](t: Key[KReader[R]]): Mapping[[X] =>> Reader[R, X]] = new Mapping[[X] =>> Reader[R, X]]:
+    def effect: Type = t.`type`()
     def toKernel[X](op: Reader[R, X]): Op[?] = new KReader.Ask[R](t)
     def answer[X](op: Reader[R, X], v: Any): X = op match
       case Reader.Ask() => trust[X](v)
       case Reader.Asks(f) => f(trust[R](v))
     def fromKernel(op: Op[?]): Okayed[[X] =>> Reader[R, X], ?] = Okayed[[X] =>> Reader[R, X], R](Reader.Ask[R](), r => r)
 
-  /** okay's `Writer % W` as the kernel's writer of the type `t` */
-  def writer[W](t: Type): Mapping[[X] =>> Writer[W, X]] = new Mapping[[X] =>> Writer[W, X]]:
-    def effect: Type = t
+  /** okay's `Writer % W` as the kernel's writer of the key `t` */
+  def writer[W](t: Key[KWriter[W]]): Mapping[[X] =>> Writer[W, X]] = new Mapping[[X] =>> Writer[W, X]]:
+    def effect: Type = t.`type`()
     def toKernel[X](op: Writer[W, X]): Op[?] = op match
       case Writer.Tell(w) => new KWriter.Tell[W](t, w)
     def answer[X](op: Writer[W, X], v: Any): X = op match
       case Writer.Tell(_) => ()
     def fromKernel(op: Op[?]): Okayed[[X] =>> Writer[W, X], ?] =
-      KWriter.narrow[W, Any](trust[Op[Any]](op)).fold(new KWriter.Cases[W, Any, Okayed[[X] =>> Writer[W, X], ?]]:
+      KWriter.narrow(t, trust[Op[Any]](op)).fold(new KWriter.Cases[W, Any, Okayed[[X] =>> Writer[W, X], ?]]:
         def tell(w: W, v: Same[Void, Any]) = Okayed[[X] =>> Writer[W, X], Unit](Writer.Tell(w), _ => null))
 
-  /** okay's `Throws % E` as the kernel's of the type `t`: a raise never answered */
-  def throws[E](t: Type): Mapping[[X] =>> Throws[E, X]] = new Mapping[[X] =>> Throws[E, X]]:
-    def effect: Type = t
+  /** okay's `Throws % E` as the kernel's of the key `t`: a raise never answered */
+  def throws[E](t: Key[KThrows[E]]): Mapping[[X] =>> Throws[E, X]] = new Mapping[[X] =>> Throws[E, X]]:
+    def effect: Type = t.`type`()
     def toKernel[X](op: Throws[E, X]): Op[?] = op match
       case Throws.Raise(e) => new KThrows.Raise[E, Any](t, e)
     def answer[X](op: Throws[E, X], v: Any): X = throw IllegalStateException(s"a raise answered: $op")
     def fromKernel(op: Op[?]): Okayed[[X] =>> Throws[E, X], ?] =
-      KThrows.narrow[E, Any](trust[Op[Any]](op)).fold(new KThrows.Cases[E, Any, Okayed[[X] =>> Throws[E, X], ?]]:
+      KThrows.narrow(t, trust[Op[Any]](op)).fold(new KThrows.Cases[E, Any, Okayed[[X] =>> Throws[E, X], ?]]:
         def raise(e: E) = Okayed[[X] =>> Throws[E, X], Nothing](Throws.Raise(e), n => n))
 
-  /** okay's `Choose` as the kernel's, `Choose.TYPE` */
+  /** okay's `Choose` as the kernel's, `Choose.KEY` */
   val choose: Mapping[Choose] = new Mapping[Choose]:
     def effect: Type = KChoose.TYPE
     def toKernel[X](op: Choose[X]): Op[?] = op match
       case Choose.Among(as) => new KChoose.Among[Any](as.asJava)
     def answer[X](op: Choose[X], v: Any): X = trust[X](v)
     def fromKernel(op: Op[?]): Okayed[Choose, ?] =
-      KChoose.narrow[Any](trust[Op[Any]](op)).fold(new KChoose.Cases[Any, Okayed[Choose, ?]]:
+      KChoose.narrow(KChoose.KEY, trust[Op[Any]](op)).fold(new KChoose.Cases[Any, Okayed[Choose, ?]]:
         def among(xs: java.util.List[Any]) = Okayed[Choose, Any](Choose.Among(xs.asScala.toSeq), x => x))
 
 /**
