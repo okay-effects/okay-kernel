@@ -137,8 +137,52 @@ lazy val scalaApi = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .jsSettings(Compile / unmanagedSourceDirectories += apiMirror(baseDirectory.value))
   .nativeSettings(Compile / unmanagedSourceDirectories += apiMirror(baseDirectory.value))
 
+/**
+ * THE KERNEL'S REFERENCE MACHINE: `Effects` and the protocol, exact rather than fast — what the TCK checks every
+ * implementation against. Scala 3 and 2.13, the JVM, JS, Native: `dev.okay::okay-kernel-steps`
+ */
+lazy val steps = crossProject(JVMPlatform, JSPlatform, NativePlatform)
+  .crossType(CrossType.Pure)
+  .in(file("steps"))
+  .dependsOn(scalaApi)
+  .settings(
+    name := "okay-kernel-steps",
+    crossScalaVersions := Seq("3.9.0", "2.13.18"),
+    scalacOptions ++= (if (scalaVersion.value.startsWith("2.")) Seq("-deprecation", "-Xsource:3") else Seq("-deprecation")),
+    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test)
+  // the standard handlers are the API's Java on the JVM: the tests using them, the JVM's
+  .jvmSettings(Test / unmanagedSourceDirectories += baseDirectory.value.getParentFile / "src" / "test" / "scala-jvm")
+
+/** THE REFERENCE MACHINE IN JAVA: the same as `steps`, pure Java on the API alone — `dev.okay:okay-kernel-steps-java` */
+lazy val stepsJava = (project in file("steps-java"))
+  .dependsOn(api)
+  .settings(
+    name := "okay-kernel-steps-java",
+    crossPaths := false,
+    autoScalaLibrary := false,
+    javacOptions ++= Seq("--release", "21", "-Xlint:all", "-Xlint:-serial", "-Werror"),
+    Compile / doc / javacOptions := Seq("--release", "21"),
+    libraryDependencies ++= Seq("com.github.sbt.junit" % "jupiter-interface" % "0.19.0" % Test, "org.junit.jupiter" % "junit-jupiter" % "5.13.4" % Test),
+    Test / fork := true,
+    Test / javaOptions += "-Xss512k",
+    Compile / packageDoc / publishArtifact := false)
+
+/**
+ * THE TCK: what every implementation is checked by — the laws of `Effects`, the standard handlers written once, the
+ * protocol (export, import, multi-shot k, fail, cancel, a resume from another thread, nesting through systems), random
+ * programs with one digest. A library: an implementation runs it on its own `Effects` — `dev.okay::okay-kernel-tck`
+ */
+lazy val tck = (project in file("tck"))
+  .dependsOn(scalaApi.jvm, steps.jvm % Test, stepsJava % Test)
+  .settings(
+    name := "okay-kernel-tck",
+    crossScalaVersions := Seq("3.9.0", "2.13.18"),
+    scalacOptions ++= (if (scalaVersion.value.startsWith("2.")) Seq("-deprecation", "-Xsource:3") else Seq("-deprecation")),
+    libraryDependencies += "org.scalameta" %% "munit" % "1.2.3",
+    Test / fork := true)
+
 lazy val root = (project in file("."))
-  .aggregate(api, scalaApi.jvm, scalaApi.js, scalaApi.native, legacy)
+  .aggregate(api, scalaApi.jvm, scalaApi.js, scalaApi.native, steps.jvm, steps.js, steps.native, stepsJava, tck, legacy)
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
 
 lazy val legacy = (project in file("legacy"))

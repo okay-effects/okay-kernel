@@ -10,6 +10,17 @@ public final class Choose {
 
   public static final Type TYPE = Type.of(Choose.class);
 
+  /**
+   * AN OPERATION OF THIS EFFECT, AS ONE OF ITS OPERATIONS — what a handler found by the effect's identity is given.
+   * The one trusted step of the vocabulary: an operation of the effect {@code Choose...} is one of {@code Ops}, its
+   * type arguments the effect's (its {@code Type} says so). Checked as far as the JVM can: not one of them, a failure
+   */
+  @SuppressWarnings("unchecked")
+  public static <X> Ops<X> narrow(okay.kernel.Op<X> op) {
+    if (op instanceof Choose.Ops<?>) return (Ops<X>) op;
+    throw new IllegalArgumentException("not an operation of Choose: " + op);
+  }
+
   public sealed interface Ops<X> extends Op<X> permits Among {
     <R> R fold(Cases<X, R> c);
   }

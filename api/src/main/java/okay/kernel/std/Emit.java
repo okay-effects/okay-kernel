@@ -10,6 +10,17 @@ public final class Emit {
 
   public static Type of(Type w) { return Type.of(Emit.class, w); }
 
+  /**
+   * AN OPERATION OF THIS EFFECT, AS ONE OF ITS OPERATIONS — what a handler found by the effect's identity is given.
+   * The one trusted step of the vocabulary: an operation of the effect {@code Emit...} is one of {@code Ops}, its
+   * type arguments the effect's (its {@code Type} says so). Checked as far as the JVM can: not one of them, a failure
+   */
+  @SuppressWarnings("unchecked")
+  public static <W, X> Ops<W, X> narrow(okay.kernel.Op<X> op) {
+    if (op instanceof Emit.Ops<?, ?>) return (Ops<W, X>) op;
+    throw new IllegalArgumentException("not an operation of Emit: " + op);
+  }
+
   public sealed interface Ops<W, X> extends Op<X> permits Send {
     <R> R fold(Cases<W, X, R> c);
   }

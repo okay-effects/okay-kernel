@@ -43,4 +43,13 @@ public interface Effects {
 
   /** {@code body}, a cancellation waiting till it ends */
   <A> Prog<A> uncancelable(Program<A> body);
+
+  // -- the protocol's two doors, every implementation's
+
+  /** EXPORT: a program, handed out — run on this implementation's machine, stepping out where it needs what it cannot
+   * answer; its row {@code effects} as known where it was written */
+  <A> Computation<A> computation(Program<A> program, java.util.Set<Type> effects);
+
+  /** IMPORT: another's program as one of this implementation — its operations answered here */
+  <A> Prog<A> foreign(Computation<A> computation);
 }

@@ -103,6 +103,8 @@ trait Effects {
   def recover[A](body: Program[A], h: Fn[Throwable, Prog[A]]): Prog[A]
   def ensuring[A](body: Program[A], finalizer: Program[Void]): Prog[A]
   def uncancelable[A](body: Program[A]): Prog[A]
+  def computation[A](program: Program[A], effects: java.util.Set[Type]): Computation[A]
+  def foreign[A](computation: Computation[A]): Prog[A]
 }
 
 trait Handler[A, R] { def effect(): Type }

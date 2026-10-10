@@ -14,6 +14,17 @@ public final class Control {
   /** a delimiter's identity: one a run of it */
   public static Type delimiter() { return Type.fresh(); }
 
+  /**
+   * AN OPERATION OF THIS EFFECT, AS ONE OF ITS OPERATIONS — what a handler found by the effect's identity is given.
+   * The one trusted step of the vocabulary: an operation of the effect {@code Control...} is one of {@code Ops}, its
+   * type arguments the effect's (its {@code Type} says so). Checked as far as the JVM can: not one of them, a failure
+   */
+  @SuppressWarnings("unchecked")
+  public static <X> Ops<X> narrow(okay.kernel.Op<X> op) {
+    if (op instanceof Control.Ops<?>) return (Ops<X>) op;
+    throw new IllegalArgumentException("not an operation of Control: " + op);
+  }
+
   public sealed interface Ops<X> extends Op<X> permits Capture {
     <R> R fold(Cases<X, R> c);
   }
