@@ -1,7 +1,7 @@
 package okay.kernel.okaycore
 
 import okay.core.{Effects, In, Top as CoreTop}
-import okay.kernel.{Answering, Effect, Fn, Handler, Monad, Op, Prog, Program, Returning, Thunk}
+import okay.kernel.{Answering, Direct, Effect, Fn, Handler, Monad, Op, Prog, Program, Returning, Thunk}
 
 /** the kernel's operations, every one, as one effect of okay-core's — the kernel's `Op` itself, no wrapper: its
  * handler the kernel handler's */
@@ -14,20 +14,33 @@ type Dyn[X] = Op[X]
  * A handler's answer is the program outside it, flattened when the handler is left: so `k` is the rest with the
  * handler and its `ret`, deep, as the kernel says.
  */
-final class OnCore private (val c: Effects, effs: List[Effect], top: CoreTop) extends Monad:
+final class OnCore private (val c: Effects, effs: List[Effect], top: CoreTop) extends Direct:
   private type P = c.M[Any, Any, Any]
   /** okay-core's program, as the kernel's: a wrapper — one object a node, the adapter's cost */
   private final class W[A](val p: Any) extends Prog[A]
-  private inline def prog(x: Prog[?]): P = x.asInstanceOf[W[?]].p.asInstanceOf[P]
+  private inline def raw(x: Prog[?]): P = x.asInstanceOf[W[?]].p.asInstanceOf[P]
   private inline def wrap[A](p: Any): Prog[A] = W[A](p)
 
   def pure[A](a: A): Prog[A] = wrap(c.pure[Any, Any](a))
   def flatMap[A, B](p: Prog[A], f: Fn[A, Prog[B]]): Prog[B] =
-    wrap(c.flatMap(prog(p))[Any, Any](a => prog(f(a.asInstanceOf[A]))))
-  override def map[A, B](p: Prog[A], f: Fn[A, B]): Prog[B] = wrap(c.map(prog(p))(a => f(a.asInstanceOf[A])))
-  def delay[A](p: Thunk[Prog[A]]): Prog[A] = wrap(c.delay[Any, Any, Any](prog(p.get())))
+    wrap(c.flatMap(raw(p))[Any, Any](a => raw(f(a.asInstanceOf[A]))))
+  override def map[A, B](p: Prog[A], f: Fn[A, B]): Prog[B] = wrap(c.map(raw(p))(a => f(a.asInstanceOf[A])))
+  def delay[A](p: Thunk[Prog[A]]): Prog[A] = wrap(c.delay[Any, Any, Any](raw(p.get())))
 
-  def perform[X](op: Op[X]): Prog[X] =
+  def perform[X](op: Op[X]): Prog[X] = wrap(performed(op))
+
+  // SCALA'S TYPED PROGRAMS, BUILT DIRECTLY: okay-core's programs themselves, a bind's function the program's own
+  def directPure(a: Any): Any = c.pure[Any, Any](a)
+  def directFlatMap(p: Any, f: Any => Any): Any = c.flatMap(p.asInstanceOf[P])[Any, Any](f.asInstanceOf[Any => P])
+  def directMap(p: Any, f: Any => Any): Any = c.map(p.asInstanceOf[P])(f)
+  def directDelay(p: () => Any): Any = c.delay[Any, Any, Any](p().asInstanceOf[P])
+  def directPerform(op: Op[?]): Any = performed(op)
+  def directHandle(h: Handler[?, ?], body: Program[?]): Any = raw(handle(h.asInstanceOf[Handler[Any, Any]], body.asInstanceOf[Program[Any]]))
+  def prog[A](p: Any): Prog[A] = wrap(p)
+  def unprog(p: Prog[?]): Any = raw(p)
+
+  /** an operation, okay-core's: to the nearest handler of its effect */
+  private def performed[X](op: Op[X]): P =
     val e = op.effect
     // the nearest handler of the effect, by identity: its index among those in force, innermost first
     var i = 0
@@ -36,7 +49,7 @@ final class OnCore private (val c: Effects, effs: List[Effect], top: CoreTop) ex
       rest = rest.tail
       i += 1
     if rest.isEmpty then throw IllegalStateException(s"an operation of $e with no handler of it in force")
-    wrap(c.perform[Dyn, Any, X](op, OnCore.path(i).asInstanceOf[In[Dyn, c.Effs]]))
+    c.perform[Dyn, Any, X](op, OnCore.path(i).asInstanceOf[In[Dyn, c.Effs]]).asInstanceOf[P]
 
   def handle[A, R](h: Handler[A, R], body: Program[A]): Prog[R] = h match
     case r: Returning[A, R] @unchecked => handleReturning(h, r, body)
@@ -53,9 +66,9 @@ final class OnCore private (val c: Effects, effs: List[Effect], top: CoreTop) ex
       case _ => new okay.core.Handler[c.Prog, Dyn, Any, Any]:
         def ret(x: Any): Any = r.answer(x.asInstanceOf[A])
         def apply[X](op: Dyn[X], k: X => c.Prog[Any]): c.Prog[Any] =
-          prog(h.apply[X](op, x => wrap[R](k(x)), outer)).asInstanceOf[c.Prog[Any]]
+          raw(h.apply[X](op, x => wrap[R](k(x)), outer)).asInstanceOf[c.Prog[Any]]
     wrap(c.handle[Dyn, Any, Any](ch)((ctx: c.Handled[Dyn, Any]) ?=>
-      prog(body.in(OnCore(ctx, h.effect :: effs, top))).asInstanceOf[c.Handling[Dyn, Any, Any, Any]]))
+      raw(body.in(OnCore(ctx, h.effect :: effs, top))).asInstanceOf[c.Handling[Dyn, Any, Any, Any]]))
 
   private def handleGeneral[A, R](h: Handler[A, R], body: Program[A]): Prog[R] =
     val outer = this
@@ -67,13 +80,13 @@ final class OnCore private (val c: Effects, effs: List[Effect], top: CoreTop) ex
         def ret(x: Any): Any = h.ret(x.asInstanceOf[A], outer)
         def apply[X](op: Dyn[X], k: X => c.Prog[Any]): c.Prog[Any] =
           c.pure(h.apply[X](op, x => flatten[R](k(x)), outer))
-    wrap(prog(flatten[R](c.handle[Dyn, Any, Any](ch)((ctx: c.Handled[Dyn, Any]) ?=>
-      prog(body.in(OnCore(ctx, h.effect :: effs, top))).asInstanceOf[c.Handling[Dyn, Any, Any, Any]]))))
+    wrap(raw(flatten[R](c.handle[Dyn, Any, Any](ch)((ctx: c.Handled[Dyn, Any]) ?=>
+      raw(body.in(OnCore(ctx, h.effect :: effs, top))).asInstanceOf[c.Handling[Dyn, Any, Any, Any]]))))
 
   /** an answer that is a program, its own (wrapped): run on */
-  private def flatten[R](p: Any): Prog[R] = wrap(c.flatMap(p.asInstanceOf[P])[Any, Any](inner => prog(inner.asInstanceOf[Prog[?]])))
+  private def flatten[R](p: Any): Prog[R] = wrap(c.flatMap(p.asInstanceOf[P])[Any, Any](inner => raw(inner.asInstanceOf[Prog[?]])))
 
-  def run[A](p: Prog[A]): A = top.run[Any](prog(p).asInstanceOf[top.M[Any, Any, Any, Any]]).asInstanceOf[A]
+  def run[A](p: Prog[A]): A = top.run[Any](raw(p).asInstanceOf[top.M[Any, Any, Any, Any]]).asInstanceOf[A]
 
 object OnCore:
   /** the path past `i` effects — the same in every context, made once: `There` `i` times, then `Here` */

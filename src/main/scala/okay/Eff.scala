@@ -1,7 +1,7 @@
 package okay
 
 import scala.annotation.unchecked.uncheckedVariance
-import okay.kernel.{Handler as KHandler, Monad, Op, Prog, Program, Steps}
+import okay.kernel.{Direct, Handler as KHandler, Monad, Op, Prog, Program, Steps}
 
 /** an effect of a type parameter in a row: `Writer % String` */
 infix type %[E[_], T] = E[T]
@@ -17,27 +17,43 @@ infix type ![A, R] = Eff[R, A]
  * effects is one needing more. Its nodes, a class each: written, one object a step, no closure — built in a monad,
  * one closure a bind */
 sealed abstract class Eff[-R, +A] extends Program[A @uncheckedVariance]:
+  /** built in a monad that builds Scala's programs directly: its own nodes, no kernel `Prog` between */
+  private[okay] def build(d: Direct): Any
+  /** built in `m`: directly, if it can */
+  final def in(m: Monad): Prog[A @uncheckedVariance] = m match
+    case d: Direct => d.prog(build(d))
+    case _ => via(m)
+  /** built in `m` by the kernel's interface */
+  protected def via(m: Monad): Prog[A @uncheckedVariance]
   def flatMap[R2, B](f: A => Eff[R2, B]): Eff[R & R2, B] = Eff.FlatMap(this, f)
   def map[B](f: A => B): Eff[R, B] = Eff.MapE(this, f)
   def andThen[R2, B](next: Eff[R2, B]): Eff[R & R2, B] = flatMap(_ => next)
 
 object Eff:
   private final class PureE[A](a: A) extends Eff[Any, A]:
-    def in(m: Monad): Prog[A] = m.pure(a)
+    protected def via(m: Monad): Prog[A] = m.pure(a)
+    private[okay] def build(d: Direct): Any = d.directPure(a)
   private final class FlatMap[R, A, B](p: Eff[R, A], f: A => Eff[?, B]) extends Eff[R, B]:
-    def in(m: Monad): Prog[B] = m.flatMap(p.in(m), a => f(a).in(m))
+    protected def via(m: Monad): Prog[B] = m.flatMap(p.in(m), a => f(a).in(m))
+    private[okay] def build(d: Direct): Any = d.directFlatMap(p.build(d), a => f(a.asInstanceOf[A]).build(d))
   private final class MapE[R, A, B](p: Eff[R, A], f: A => B) extends Eff[R, B]:
-    def in(m: Monad): Prog[B] = m.map(p.in(m), a => f(a))
+    protected def via(m: Monad): Prog[B] = m.map(p.in(m), a => f(a))
+    private[okay] def build(d: Direct): Any = d.directMap(p.build(d), f.asInstanceOf[Any => Any])
   private final class DelayE[R, A](p: () => Eff[R, A]) extends Eff[R, A]:
-    def in(m: Monad): Prog[A] = m.delay(() => p().in(m))
+    protected def via(m: Monad): Prog[A] = m.delay(() => p().in(m))
+    private[okay] def build(d: Direct): Any = d.directDelay(() => p().build(d))
   private final class PerformE[R, A](op: Op[A]) extends Eff[R, A]:
-    def in(m: Monad): Prog[A] = m.perform(op)
+    protected def via(m: Monad): Prog[A] = m.perform(op)
+    private[okay] def build(d: Direct): Any = d.directPerform(op)
   private final class HandleE[R, A, B](h: KHandler[A, B], p: Program[A]) extends Eff[R, B]:
-    def in(m: Monad): Prog[B] = m.handle(h, p)
+    protected def via(m: Monad): Prog[B] = m.handle(h, p)
+    private[okay] def build(d: Direct): Any = d.directHandle(h, p)
   private final class From[R, A](p: Program[A]) extends Eff[R, A]:
-    def in(m: Monad): Prog[A] = p.in(m)
+    protected def via(m: Monad): Prog[A] = p.in(m)
+    private[okay] def build(d: Direct): Any = d.unprog(p.in(d))
   private final class Lift[R, A](p: Prog[A]) extends Eff[R, A]:
-    def in(m: Monad): Prog[A] = p
+    protected def via(m: Monad): Prog[A] = p
+    private[okay] def build(d: Direct): Any = d.unprog(p)
 
   def pure[A](a: A): Eff[Any, A] = PureE(a)
   /** a program built when it is run: a tail call */
