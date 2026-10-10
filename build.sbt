@@ -187,7 +187,7 @@ lazy val tck = (project in file("tck"))
 lazy val integration = (project in file("integration"))
   .dependsOn(tck, steps.jvm, stepsJava)
   .settings(
-    libraryDependencies += "dev.okay" % "okay-java-kernel" % "0.1.0-SNAPSHOT" % Test,
+    libraryDependencies ++= Seq("dev.okay" % "okay-java-kernel" % "0.1.0-SNAPSHOT" % Test, "okay-core-kernel" %% "okay-core-kernel" % "0.1.0-SNAPSHOT" % Test),
     Test / fork := true,
     publish / skip := true)
 
