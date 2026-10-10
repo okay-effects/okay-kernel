@@ -41,6 +41,7 @@ lazy val scala2 = (project in file("scala2"))
 /** THE KERNEL'S MONADS ON OKAY-CORE: its machines `zero` and `cont`, the kernel's suites on them (okay-core
  * published locally: `sbt coreJVM/publishLocal` in okay-core) */
 lazy val okaycore = (project in file("okaycore"))
+  .enablePlugins(JmhPlugin)
   .dependsOn(core.jvm % "compile->compile;test->test")
   .settings(
     libraryDependencies ++= Seq("okay-core" %% "okay-core" % "0.1.0-SNAPSHOT", "org.scalameta" %% "munit" % "1.2.3" % Test),

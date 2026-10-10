@@ -73,6 +73,17 @@ object Handlers:
           else m.flatMap(k(as(i)), (r: Any) => from(i + 1, acc ++ r.asInstanceOf[List[Any]]))
         from(0, Nil)
 
+  /** the first value the body comes to, its choices tried in order, the rest not tried */
+  val first: Handler = new Handler:
+    def effect: Effect = Effects.choose
+    def ret(a: Any, m: Monad): Any = m.pure(Some(a))
+    def apply(op: Op[?], k: Fn[Any, Any], m: Monad): Any = op match
+      case Among(as) =>
+        def from(i: Int): Any =
+          if i == as.length then m.pure(None)
+          else m.flatMap(k(as(i)), (r: Any) => if r.asInstanceOf[Option[Any]].isDefined then m.pure(r) else from(i + 1))
+        from(0)
+
   /** awaits answered at once only — a callback called by its registration: the run goes on there. One called later
    * needs the run's top, `Async.start` */
   val async: Handler = new Handler:
@@ -157,6 +168,9 @@ def state[S, R, A](s0: S, p: A ! (State[S] & R))(using t: Tag[S]): (S, A) ! R =
 
 def among[A](as: Seq[A]): A ! Choose = Eff.perform(Among(as))
 def choose[R, A](p: A ! (Choose & R)): List[A] ! R = Eff.handle(Handlers.choose, p)
+/** the first value the body comes to */
+def first[R, A](p: A ! (Choose & R)): Option[A] ! R = Eff.handle(Handlers.first, p)
+def fail[A]: A ! Choose = among(Seq.empty[A])
 
 /** a callback's value, awaited */
 def await[A](register: Callback[A] => Unit): A ! Async = Eff.perform(Await[A](c => register(c)))
