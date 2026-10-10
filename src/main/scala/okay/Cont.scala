@@ -1,6 +1,7 @@
 package okay
 
 import okay.kernel.{Effect, Fn, Handler, Monad, Op, Prog, Program, Steps}
+import okay.kernel.std.Shift0
 
 /**
  * DELIMITED CONTROL, THE ANSWER TYPE MODIFIED, STATICALLY — one type for all of it: Materzok–Biernacki's shift0 and
@@ -16,15 +17,14 @@ final class Cont[I, O, A] private[okay] (private[okay] val p: Program[A]):
   def map[B](f: Fn[A, B]): Cont[I, O, B] = Cont(m => m.map(p.in(m), f))
 
 object Cont:
+  // the delimiters' effect, one for all — Java's `Cont` the same: a shift0 of one goes to a delimiter of the other
   private val effect: Effect = Effect.of("Reset0")
-  private final case class Shift0Op[A](f: Fn[Fn[A, Prog[Any]], Program[Any]]) extends Op[A]:
-    def effect: Effect = Cont.effect
 
   private def delimiter[A](back: A => Program[Any]): Handler[A, Any] = new Handler[A, Any]:
     def effect: Effect = Cont.effect
     def ret(a: A, m: Monad): Prog[Any] = back(a).in(m)
     def apply[X](op: Op[X], k: Fn[X, Prog[Any]], m: Monad): Prog[Any] = op match
-      case s: Shift0Op[X @unchecked] => s.f(k).in(m)
+      case s: Shift0[X @unchecked, Any @unchecked] => s.f.apply(k).in(m)
 
   private def inner[A](c: Cont[?, ?, ?]): Program[A] = c.p.asInstanceOf[Program[A]]
 
@@ -57,7 +57,7 @@ object Cont:
   def at[R]: At[R] = At[R]()
   /** the rest up to the nearest delimiter, the delimiter included, to `f`, run in its place: its answer `O` */
   def shift0[I1, O1, X1, O, A](f: Fn[Fn[A, Cont[I1, O1, X1]], O]): Cont[Cont[I1, O1, X1], O, A] =
-    Cont(m => m.perform(Shift0Op[A](k => inner(f(a => Cont(_ => k(a).asInstanceOf[Prog[X1]])).asInstanceOf[Cont[?, ?, ?]]))))
+    Cont(m => m.perform(Shift0[A, Any](effect, k => inner(f(a => Cont(_ => k(a).asInstanceOf[Prog[X1]])).asInstanceOf[Cont[?, ?, ?]]))))
   /** `ret $ body`: `body` under a delimiter, its value to `ret` */
   def dollar[I, I2, O2, B, A](ret: Fn[A, I], body: Cont[I, Cont[I2, O2, B], A]): Cont[I2, O2, B] =
     Cont(m => m.handle(delimiter[A](a => inner(ret(a).asInstanceOf[Cont[?, ?, ?]])), body.p).asInstanceOf[Prog[B]])

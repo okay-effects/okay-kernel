@@ -16,7 +16,7 @@ abstract class TestFromJava(m: Monad) extends munit.FunSuite:
   test("Scala 3's program under the handlers for Java: the log a java.util.List") {
     val r = FromJava.scalasUnderJavaTypes(m)
     assertEquals(r.log, java.util.List.of("got 1", "awaited 2"))
-    assertEquals(r.value, 4)
+    assertEquals(r.value: Any, 4: Any)
   }
 
 class TestFromJavaSteps extends TestFromJava(Steps)

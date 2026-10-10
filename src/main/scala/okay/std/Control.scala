@@ -2,6 +2,7 @@ package okay.std
 
 import okay.{!, Eff}
 import okay.kernel.{Effect, Fn, Handler, Monad, Op, Prog, Program}
+import okay.kernel.std.{Shift, Shift0}
 
 /**
  * DELIMITED CONTROL ON THE KERNEL: a reset is a handler of an effect fresh each run — its prompt — and a shift an
@@ -20,9 +21,6 @@ final class Prompt[R] private[std] (private[std] val effect: Effect):
 /** the row's element of a prompt's operations: any prompt's — the prompt's own found by its identity at run time */
 trait Ctl
 
-final case class Shift0[A, R](effect: Effect, f: Fn[Fn[A, Prog[R]], Program[R]]) extends Op[A]
-final case class Shift[A, R](effect: Effect, f: Fn[Fn[A, Prog[R]], Program[R]]) extends Op[A]
-
 /** a delimiter of a fresh prompt, its body's value the answer */
 def reset[R, X](body: Prompt[R] => R ! (Ctl & X)): R ! X =
   Eff.from[X, R] { m =>
@@ -34,5 +32,5 @@ private[okay] def delimiter[R](e: Effect): Handler[R, R] = new Handler[R, R]:
   def effect: Effect = e
   def ret(a: R, m: Monad): Prog[R] = m.pure(a)
   def apply[X](op: Op[X], k: Fn[X, Prog[R]], m: Monad): Prog[R] = op match
-    case s: Shift0[X @unchecked, R @unchecked] => s.f(k).in(m)
-    case s: Shift[X @unchecked, R @unchecked] => m.handle(this, s.f(k))
+    case s: Shift0[X @unchecked, R @unchecked] => s.f.apply(k).in(m)
+    case s: Shift[X @unchecked, R @unchecked] => m.handle(this, s.f.apply(k))

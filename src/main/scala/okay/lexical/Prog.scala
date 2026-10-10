@@ -2,7 +2,8 @@ package okay.lexical
 
 import okay.kernel.{Effect, Fn, Handler, Monad, Op, Program, Steps}
 import okay.kernel.Prog as KProg
-import okay.std.{Effects, Final, Get, Handlers, JavaHandlers, Logged, Put, Raise, Result, Tell}
+import okay.std.{Handlers, JavaHandlers}
+import okay.kernel.std.{Effects, Final, Get, Logged, Put, Raise, Result, Shift, Shift0, Tell}
 
 /**
  * THE KERNEL TYPED BY LEVELS, NOT ROWS: for Java and Scala 2, whose types have no rows. A program is at a level `L`;
@@ -66,12 +67,12 @@ object Prog:
     })
 
   private final class WriterCap[M, W](e: Effect) extends Writer[M, W]:
-    def tell(w: W): Prog[M, Unit] = Prog(m => m.perform(Tell(w, e)))
+    def tell(w: W): Prog[M, Void] = Prog(m => m.perform(Tell(w, e)))
   private final class StateCap[M, S](e: Effect) extends State[M, S]:
     def get(): Prog[M, S] = Prog(m => m.perform(Get[S](e)))
-    def put(s: S): Prog[M, Unit] = Prog(m => m.perform(Put(s, e)))
+    def put(s: S): Prog[M, Void] = Prog(m => m.perform(Put(s, e)))
   private final class ThrowsCap[M, E](e: Effect) extends Throws[M, E]:
-    def raise[X](err: E): Prog[M, X] = Prog(m => m.perform(Raise(err, e)).asInstanceOf[KProg[X]])
+    def raise[X](err: E): Prog[M, X] = Prog(m => m.perform(Raise[E, X](err, e)))
 
 /** the level of the top */
 sealed trait Top
@@ -92,11 +93,11 @@ final class Cap[L] private[lexical] (e: Effect):
   def at[M <: L]: Cap[M] = this.asInstanceOf[Cap[M]]
 
 trait Writer[L, W]:
-  def tell(w: W): Prog[L, Unit]
+  def tell(w: W): Prog[L, Void]
   def at[M <: L]: Writer[M, W] = this.asInstanceOf[Writer[M, W]]
 trait State[L, S]:
   def get(): Prog[L, S]
-  def put(s: S): Prog[L, Unit]
+  def put(s: S): Prog[L, Void]
   def at[M <: L]: State[M, S] = this.asInstanceOf[State[M, S]]
 trait Throws[L, E]:
   def raise[X](e: E): Prog[L, X]
@@ -112,7 +113,7 @@ trait ResetBody[L, R]:
 final class Prompt[L, M, R] private[lexical] (e: Effect):
   /** the rest up to this reset, the reset included, to the clause, run in its place — outside it */
   def shift0[X](clause: Fn[Fn[X, Prog[L, R]], Prog[L, R]]): Prog[M, X] =
-    Prog.of(m => m.perform(okay.std.Shift0[X, R](e, k => clause(x => Prog.of[L, R](_ => k(x))))))
+    Prog.of(m => m.perform(Shift0[X, R](e, k => clause(x => Prog.of[L, R](_ => k(x))))))
   /** the same, the clause under the reset again (Danvy–Filinski) */
   def shift[X](clause: Fn[Fn[X, Prog[L, R]], Prog[M, R]]): Prog[M, X] =
-    Prog.of(m => m.perform(okay.std.Shift[X, R](e, k => clause(x => Prog.of[L, R](_ => k(x))))))
+    Prog.of(m => m.perform(Shift[X, R](e, k => clause(x => Prog.of[L, R](_ => k(x))))))

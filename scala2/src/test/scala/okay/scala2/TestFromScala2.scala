@@ -1,7 +1,8 @@
 package okay.scala2
 
 import okay.kernel.{Fn, Monad, Op, Prog, Program, Steps}
-import okay.std.{Effects, Handlers, Tell}
+import okay.std.Handlers
+import okay.kernel.std.{Effects, Tell}
 import okay.demo.Programs
 
 /** THE KERNEL FROM SCALA 2, TYPED: Scala 3's program run, and one of Scala 2 under Scala 3's handlers */
@@ -20,7 +21,7 @@ class TestFromScala2 extends munit.FunSuite {
 
   test("a program written in Scala 2, its operations Scala 3's data") {
     val q: Program[Int] = new Program[Int] {
-      def in(m: Monad): Prog[Int] = m.flatMap(m.perform(Tell("scala2", Effects.writer(classOf[String]))), (_: Unit) => m.pure(7))
+      def in(m: Monad): Prog[Int] = m.flatMap(m.perform(new Tell("scala2", Effects.writer(classOf[String]))), (_: Void) => m.pure(7))
     }
     assertEquals(under(Steps, q), (List("scala2"), 7))
   }

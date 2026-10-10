@@ -2,6 +2,7 @@ package okay.kernel
 
 import okay.{!, %, +, Eff}
 import okay.std.*
+import okay.kernel.std.{Effects, Tell}
 
 import okay.demo.Programs
 
@@ -47,7 +48,7 @@ abstract class TestKernel(m: Monad, big: Int) extends munit.FunSuite:
   }
 
   test("an operation with no handler: an error") {
-    intercept[IllegalStateException](Program.run(new Program[Unit] {
+    intercept[IllegalStateException](Program.run(new Program[Void] {
       def in(mm: Monad) = mm.perform(Tell("x", Effects.writer(classOf[String])))
     }, m))
   }

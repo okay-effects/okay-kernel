@@ -1,6 +1,9 @@
 package okay.kernel
 
 /**
+ * THE KERNEL API'S MIRROR, for Scala.js and Scala Native: on the JVM the API is `api`'s jar, pure Java — this its
+ * signatures in Scala, the same to Scala's sources (invariant, as Java's), so they compile on every platform.
+ *
  * THE KERNEL API: what every language and every platform works with, and every monad implements — typed through,
  * by plain generics only, so Scala 3, Scala 2 and Java read it alike.
  *
@@ -15,15 +18,15 @@ package okay.kernel
  */
 
 /** a function: a lambda of Scala 3, Scala 2 or Java */
-trait Fn[-A, +B]:
+trait Fn[A, B]:
   def apply(a: A): B
 
 /** a value taken, nothing given back: Java's `void` — a callback */
-trait Sink[-A]:
+trait Sink[A]:
   def accept(a: A): Unit
 
 /** a value computed when asked */
-trait Thunk[+A]:
+trait Thunk[A]:
   def get(): A
 
 /** AN EFFECT: what a handler takes — by identity. `Effect(name)` a fresh one each call: a prompt, a delimiter of
@@ -56,7 +59,7 @@ object Effect:
       case "short" => "java.lang.Short"
       case "byte" => "java.lang.Byte"
       case "char" => "java.lang.Character"
-      case "void" => "scala.runtime.BoxedUnit"
+      case "void" => "java.lang.Void"
       case n => n
 
 /** AN OPERATION of an effect, as data, its value `X` */

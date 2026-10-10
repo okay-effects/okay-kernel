@@ -2,40 +2,11 @@ package okay.std
 
 import okay.{!, %, Eff, Tag}
 import okay.kernel.{Answering, Effect, Fn, Handler, Monad, Op, Prog, Program, Sink, Thunk}
+import okay.kernel.std.{Among, Await, Callback, Effects, Get, Put, Raise, Tell}
 
-// THE STANDARD EFFECTS: their operations data, their handlers values, typed — the same for every language (Java
-// builds `new Tell<>(w, Effects.writer(String.class))`, takes `Handlers.writer(e)`); Scala 3 has them by its rows too
-
-/** the effects: of a name and the types they are over, one for all who ask */
-object Effects:
-  def writer(w: String): Effect = Effect.of("Writer", w)
-  def writer(w: Class[?]): Effect = writer(Effect.typeName(w))
-  def throws(e: String): Effect = Effect.of("Throws", e)
-  def throws(e: Class[?]): Effect = throws(Effect.typeName(e))
-  def state(s: String): Effect = Effect.of("State", s)
-  def state(s: Class[?]): Effect = state(Effect.typeName(s))
-  val async: Effect = Effect.of("Async")
-  val choose: Effect = Effect.of("Choose")
-
-/** a log: `w` in front of the rest's */
-final case class Tell[W](w: W, effect: Effect) extends Op[Unit]
-/** a failure: the rest dropped */
-final case class Raise[E](e: E, effect: Effect) extends Op[Nothing]
-/** a state's, read and written: answered in place from the handler's cell */
-final case class Get[S](effect: Effect) extends Op[S]
-final case class Put[S](s: S, effect: Effect) extends Op[Unit]
-/** a choice among values: the rest run for each (multi-shot) */
-final case class Among[A](as: Seq[A]) extends Op[A]:
-  def effect: Effect = Effects.choose
-
-/** a callback's value awaited: `register` given the callback, called now or later, from any thread */
-final case class Await[A](register: Sink[Callback[A]]) extends Op[A]:
-  def effect: Effect = Effects.async
-
-/** what a callback is given: the value, or the failure */
-trait Callback[-A]:
-  def ok(a: A): Unit
-  def fail(e: Throwable): Unit
+// THE STANDARD EFFECTS: their data — effects, operations, answers — the API's, `okay.kernel.std`, one class each for
+// every implementation (okay-java's handlers take this one's operations, and back); their handlers values, typed;
+// Scala 3 has them by its rows too. An operation of value `Void` answered `null`: Java's continuations cast to `Void`
 
 /** the handlers, typed values: any language installs them on any monad */
 object Handlers:
@@ -57,7 +28,7 @@ object Handlers:
     def effect: Effect = e
     def ret(a: A, m: Monad): Prog[(List[W], A)] = m.pure((Nil, a))
     def apply[X](op: Op[X], k: Fn[X, Prog[(List[W], A)]], m: Monad): Prog[(List[W], A)] = op match
-      case Tell(w, _) => m.map(k(()), (log, a) => (w.asInstanceOf[W] :: log, a))
+      case t: Tell[?] => m.map(k(null.asInstanceOf[X]), (log, a) => (t.w.asInstanceOf[W] :: log, a))
 
   /** the body's value a `Right`, a raise's a `Left` */
   def throws[E, A](e: Effect): Handler[A, Either[E, A]] =
@@ -66,7 +37,7 @@ object Handlers:
     def effect: Effect = e
     def ret(a: A, m: Monad): Prog[Either[E, A]] = m.pure(Right(a))
     def apply[X](op: Op[X], k: Fn[X, Prog[Either[E, A]]], m: Monad): Prog[Either[E, A]] = op match
-      case Raise(err, _) => m.pure(Left(err.asInstanceOf[E]))
+      case r: Raise[?, ?] => m.pure(Left(r.error.asInstanceOf[E]))
 
   /** a cell, one a run of the handler: the final state with the value */
   def state[S, A](e: Effect, s0: S): Handler[A, (S, A)] = new Answering[A, (S, A)]:
@@ -74,43 +45,45 @@ object Handlers:
     def effect: Effect = e
     def ret(a: A, m: Monad): Prog[(S, A)] = m.pure((s, a))
     def value[X](op: Op[X]): X = op match
-      case Get(_) => s.asInstanceOf[X]
-      case Put(n, _) => s = n.asInstanceOf[S]; ().asInstanceOf[X]
+      case p: Put[?] => s = p.s.asInstanceOf[S]; null.asInstanceOf[X]
+      case _ => s.asInstanceOf[X]
 
   /** every value the body comes to, a list, one a path through its choices */
   def choose[A]: Handler[A, List[A]] = chooseAll.asInstanceOf[Handler[A, List[A]]]
   private val chooseAll: Handler[Any, List[Any]] = new Handler[Any, List[Any]]:
-    def effect: Effect = Effects.choose
+    def effect: Effect = Effects.CHOOSE
     def ret(a: Any, m: Monad): Prog[List[Any]] = m.pure(List(a))
     def apply[X](op: Op[X], k: Fn[X, Prog[List[Any]]], m: Monad): Prog[List[Any]] = op match
-      case Among(as) =>
+      case c: Among[X @unchecked] =>
+        val as = c.as
         def from(i: Int, acc: List[Any]): Prog[List[Any]] =
-          if i == as.length then m.pure(acc)
-          else m.flatMap(k(as(i)), r => from(i + 1, acc ++ r))
+          if i == as.size then m.pure(acc)
+          else m.flatMap(k(as.get(i)), r => from(i + 1, acc ++ r))
         from(0, Nil)
 
   /** the first value the body comes to, its choices tried in order, the rest not tried */
   def first[A]: Handler[A, Option[A]] = chooseFirst.asInstanceOf[Handler[A, Option[A]]]
   private val chooseFirst: Handler[Any, Option[Any]] = new Handler[Any, Option[Any]]:
-    def effect: Effect = Effects.choose
+    def effect: Effect = Effects.CHOOSE
     def ret(a: Any, m: Monad): Prog[Option[Any]] = m.pure(Some(a))
     def apply[X](op: Op[X], k: Fn[X, Prog[Option[Any]]], m: Monad): Prog[Option[Any]] = op match
-      case Among(as) =>
+      case c: Among[X @unchecked] =>
+        val as = c.as
         def from(i: Int): Prog[Option[Any]] =
-          if i == as.length then m.pure(None)
-          else m.flatMap(k(as(i)), r => if r.isDefined then m.pure(r) else from(i + 1))
+          if i == as.size then m.pure(None)
+          else m.flatMap(k(as.get(i)), r => if r.isDefined then m.pure(r) else from(i + 1))
         from(0)
 
   /** awaits answered at once only — a callback called by its registration: the run goes on there. One called later
    * needs the run's top, `Async.start` */
   def async[A]: Handler[A, A] = asyncNow.asInstanceOf[Handler[A, A]]
   private val asyncNow: Handler[Any, Any] = new Handler[Any, Any]:
-    def effect: Effect = Effects.async
+    def effect: Effect = Effects.ASYNC
     def ret(a: Any, m: Monad): Prog[Any] = m.pure(a)
     def apply[X](op: Op[X], k: Fn[X, Prog[Any]], m: Monad): Prog[Any] = op match
-      case Await(register) =>
+      case w: Await[X @unchecked] =>
         val cell = Async.Cell[X]()
-        register.accept(cell)
+        w.register.accept(cell)
         if !cell.answered then throw IllegalStateException("an await answered later, under no Async.start")
         cell.failure match
           case null => k(cell.value)
@@ -145,12 +118,12 @@ object Async:
         case Answer.Done(a) => done.accept(a)
         case Answer.Suspended =>
     lazy val top: Handler[A, Answer[A]] = new Handler[A, Answer[A]]:
-      def effect: Effect = Effects.async
+      def effect: Effect = Effects.ASYNC
       def ret(a: A, mm: Monad): Prog[Answer[A]] = mm.pure(Answer.Done(a))
       def apply[X](op: Op[X], k: Fn[X, Prog[Answer[A]]], mm: Monad): Prog[Answer[A]] = op match
-        case Await(register) =>
+        case w: Await[X @unchecked] =>
           val cell = Cell[X]()
-          register.accept(cell)
+          w.register.accept(cell)
           cell.synchronized {
             if cell.answered then
               cell.failure match
@@ -175,24 +148,30 @@ trait Choose
 trait Async
 
 private def writerE(t: Tag[?]): Effect = t.effect(Tag.Writer, Effects.writer)
-private def throwsE(t: Tag[?]): Effect = t.effect(Tag.Throws, Effects.throws)
+private def throwsE(t: Tag[?]): Effect = t.effect(Tag.Throws, Effects.throwsOf)
 private def stateE(t: Tag[?]): Effect = t.effect(Tag.State, Effects.state)
 
-def tell[W](w: W)(using t: Tag[W]): Unit ! Writer % W = Eff.perform(Tell(w, writerE(t)))
+/** a `Void` operation's `null`, Scala's `()` */
+private val unit: Void => Unit = _ => ()
+
+def tell[W](w: W)(using t: Tag[W]): Unit ! Writer % W = Eff.perform[Writer[W], Void](Tell(w, writerE(t))).map(unit)
 def writer[W, R, A](p: A ! (Writer[W] & R))(using t: Tag[W]): (List[W], A) ! R =
   Eff.handle(t.handler(Tag.Writer, Handlers.writer[W, A](writerE(t))), p)
 
-def raise[E](e: E)(using t: Tag[E]): Nothing ! Throws % E = Eff.perform(Raise(e, throwsE(t)))
+def raise[E](e: E)(using t: Tag[E]): Nothing ! Throws % E = Eff.perform(Raise[E, Nothing](e, throwsE(t)))
 def attempt[E, R, A](p: A ! (Throws[E] & R))(using t: Tag[E]): Either[E, A] ! R =
   Eff.handle(t.handler(Tag.Throws, Handlers.throws[E, A](throwsE(t))), p)
 
 def get[S](using t: Tag[S]): S ! State % S = Eff.perform(Get[S](stateE(t)))
-def put[S](s: S)(using t: Tag[S]): Unit ! State % S = Eff.perform(Put(s, stateE(t)))
+def put[S](s: S)(using t: Tag[S]): Unit ! State % S = Eff.perform[State[S], Void](Put(s, stateE(t))).map(unit)
 /** a state of a cell, one a run */
 def state[S, R, A](s0: S, p: A ! (State[S] & R))(using t: Tag[S]): (S, A) ! R =
   Eff.from[R, (S, A)](m => m.handle(Handlers.state[S, A](stateE(t), s0), p))
 
-def among[A](as: Seq[A]): A ! Choose = Eff.perform(Among(as))
+def among[A](as: Seq[A]): A ! Choose =
+  val l = java.util.ArrayList[A](as.size)
+  as.foreach(l.add)
+  Eff.perform(Among(l))
 def choose[R, A](p: A ! (Choose & R)): List[A] ! R = Eff.handle(Handlers.choose[A], p)
 /** the first value the body comes to */
 def first[R, A](p: A ! (Choose & R)): Option[A] ! R = Eff.handle(Handlers.first[A], p)

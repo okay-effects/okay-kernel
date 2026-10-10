@@ -1,8 +1,28 @@
 ThisBuild / scalaVersion := "3.9.0"
+ThisBuild / organization := "dev.okay"
+ThisBuild / version := "0.1.0-SNAPSHOT"
+// okay-java, published by Gradle to ~/.m2: the JVM's tests run its machine and handlers with this one's
+ThisBuild / resolvers += Resolver.mavenLocal
+
+/**
+ * THE KERNEL API, BINARY: pure Java, no dependency — `dev.okay:okay-kernel-api`. The JVM's implementations, this
+ * one's Scala and okay-java's Java, compiled against it: one class an interface, an operation, an answer — a program,
+ * a handler, a monad of one works with those of another (`sbt api/publishM2` for okay-java)
+ */
+lazy val api = (project in file("api"))
+  .settings(
+    name := "okay-kernel-api",
+    crossPaths := false,
+    autoScalaLibrary := false,
+    javacOptions ++= Seq("--release", "17"),
+    Compile / packageDoc / publishArtifact := false)
+
+/** the API's mirror for Scala.js and Scala Native, no Java there: the same signatures, in Scala */
+def mirror(base: File) = base.getParentFile / "src" / "main" / "scala-mirror"
 
 /**
  * THE KERNEL, CROSS-BUILT: the JVM, Scala.js, Scala Native — one source tree, `src/`, shared; the JVM's own tests
- * (Java's among them) in `src/test/scala-jvm`
+ * (Java's among them) in `src/test/scala-jvm`. On the JVM the API is `api`'s jar, elsewhere its mirror
  */
 lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .crossType(CrossType.Pure)
@@ -11,7 +31,11 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     name := "okay-kernel",
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test
   )
+  .jvmConfigure(_.dependsOn(api))
+  .jsSettings(Compile / unmanagedSourceDirectories += mirror(baseDirectory.value))
+  .nativeSettings(Compile / unmanagedSourceDirectories += mirror(baseDirectory.value))
   .jvmSettings(
+    libraryDependencies += "dev.okay" % "okay-java" % "0.1.0-SNAPSHOT" % Test,
     Test / unmanagedSourceDirectories += baseDirectory.value.getParentFile / "src" / "test" / "scala-jvm",
     // forked: Java's compiler in the tests (`Javac`) given the test's classpath as `java.class.path`
     Test / fork := true
@@ -49,6 +73,6 @@ lazy val okaycore = (project in file("okaycore"))
     publish / skip := true)
 
 lazy val root = (project in file("."))
-  .aggregate(core.jvm, core.js, core.native, scala2, okaycore)
+  .aggregate(api, core.jvm, core.js, core.native, scala2, okaycore)
   // the aggregate only: the sources are the cross-project's
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)

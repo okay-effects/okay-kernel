@@ -1,8 +1,10 @@
 package okay.kernel.okaycore
 
 import okay.kernel.*
-import okay.std.{Among, Effects, Get, Handlers, Put, Raise, Tell}
+import okay.std.Handlers
+import okay.kernel.std.{Effects}
 import scala.util.Random
+import scala.jdk.CollectionConverters.*
 
 /**
  * EVERY MONAD AGREES: programs made at random — handlers of logs, states, failures and choices nested in any order,
@@ -28,7 +30,7 @@ class TestAgree extends munit.FunSuite:
   // two effects of each kind, told apart by their types: an Int's and a String's
   private def writerE(e: Int) = Effects.writer(if e == 0 then "java.lang.Integer" else "java.lang.String")
   private def stateE(e: Int) = Effects.state(if e == 0 then "java.lang.Integer" else "java.lang.String")
-  private def throwsE(e: Int) = Effects.throws(if e == 0 then "java.lang.Integer" else "java.lang.String")
+  private def throwsE(e: Int) = Effects.throwsOf(if e == 0 then "java.lang.Integer" else "java.lang.String")
 
   def gen(r: Random, depth: Int): T =
     val leaf = depth <= 0 || r.nextInt(4) == 0
@@ -50,11 +52,11 @@ class TestAgree extends munit.FunSuite:
   /** the program in the monad: every value an Int, a handler's answer folded into one */
   def build(p: T, m: Monad): Prog[Int] = p match
     case T.Pure(n) => m.pure(n)
-    case T.Tell(e, n) => m.map(m.perform(okay.std.Tell(n, writerE(e))), _ => n)
-    case T.Get(e) => m.perform(okay.std.Get[Int](stateE(e)))
-    case T.Put(e, n) => m.map(m.perform(okay.std.Put(n, stateE(e))), _ => n)
-    case T.Among(ns) => m.perform(okay.std.Among(ns))
-    case T.Raise(e, n) => m.map(m.perform(okay.std.Raise(n, throwsE(e))), x => x)
+    case T.Tell(e, n) => m.map(m.perform(okay.kernel.std.Tell(n, writerE(e))), _ => n)
+    case T.Get(e) => m.perform(okay.kernel.std.Get[Int](stateE(e)))
+    case T.Put(e, n) => m.map(m.perform(okay.kernel.std.Put(n, stateE(e))), _ => n)
+    case T.Among(ns) => m.perform(okay.kernel.std.Among(java.util.List.copyOf(ns.map(Int.box).asJava)).asInstanceOf[Op[Int]])
+    case T.Raise(e, n) => m.map(m.perform(okay.kernel.std.Raise[Int, Int](n, throwsE(e))), x => x)
     case T.Seq(a, b) => m.flatMap(build(a, m), _ => build(b, m))
     case T.Add(a, b) => m.flatMap(build(a, m), x => m.map(build(b, m), y => x + y))
     case T.Writer(e, body) =>
@@ -71,7 +73,9 @@ class TestAgree extends munit.FunSuite:
     try Right(Program.run[Int](mm => build(p, mm), m))
     catch case e: IllegalStateException => Left("no handler")
 
-  val monads = List("Steps" -> Steps, "Ref" -> Ref, "zero" -> OnCore.zero, "cont" -> OnCore.cont)
+  // okay-java's machine among them: its jar, binary, on the same API
+  val monads = List("Steps" -> Steps, "Ref" -> Ref, "zero" -> OnCore.zero, "cont" -> OnCore.cont,
+    "java" -> okay.java.kernel.Monads.steps())
 
   test("a thousand programs at random: every monad agrees") {
     val r = Random(20261010)

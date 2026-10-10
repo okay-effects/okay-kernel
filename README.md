@@ -33,12 +33,27 @@ No `Any` in its signatures, no context function, union, type member or higher ki
 Scala 3 writes handlers typed by its rows too: `okay.Handler[E, A, R, Rest]` — itself a kernel `Handler[A, R]` —
 its clauses on `R ! Rest`, its `handle` taking `E` off a program's row and putting `Rest` on.
 
+## Binary: one jar of the API (`api/`, `dev.okay:okay-kernel-api`)
+
+On the JVM the API is pure Java with no dependency: the interfaces above, `Effect`, and the standard effects' data
+(`okay.kernel.std`) — `Effects`, the operations `Tell`, `Raise`, `Get`, `Put`, `Among`, `Await`, `Shift0`, `Shift`,
+`Callback`, and the handlers' Java answers `Logged`, `Result`, `Final`. This kernel's Scala and okay-java's Java are
+compiled against that one jar. One class for an interface, an operation, an answer: a program, a handler, a monad of
+one works with those of the other, nothing translated. Their implementations have packages of their own (`okay.*`
+here, `okay.java.kernel.*` there), so both jars share one classpath. An operation of value `Void` is answered
+`null`: Java's continuations cast to `Void`. On Scala.js and Scala Native, with no Java, the API is its Scala mirror
+(`src/main/scala-mirror`): the same signatures, invariant as Java's.
+
+Built in order, through `~/.m2`: `sbt api/publishM2` (okay-java compiles against it), then okay-java's
+`./gradlew publishToMavenLocal` (this kernel's JVM tests run its machine and handlers: `TestBinary`, `TestAgree`).
+
 ## The monads
 
 - `Steps`: okay-java's machine — nodes over an explicit stack of handlers on the heap, handlers nested as deep as
   the heap allows, one step a kind of node.
 - `Ref` (tests): the textbook, recursive — what every monad must agree with.
 - `OnCore.zero`, `OnCore.cont` (`okaycore/`): okay-core's machines through its `Effects`.
+- okay-java's `okay.java.kernel.Steps`: its jar, binary — the same random programs, the same outcomes (`TestAgree`).
 
 ## Scala 3's typed view (`okay`, `okay.std`)
 
@@ -50,4 +65,5 @@ by `Eff.from`, their effects as said, checked at run time.
 ## Tests
 
 `sbt test`: the same suite on every monad, on the JVM, Scala.js and Scala Native; Java's programs and Scala 3's in
-one, both ways (`src/test/scala-jvm`); Scala 2's (`scala2/`).
+one, both ways (`src/test/scala-jvm`); okay-java's jar with this one's, in one run (`TestBinary`); Scala 2's
+(`scala2/`).

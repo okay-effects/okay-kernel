@@ -1,10 +1,10 @@
 package okay.kernel;
 
 import okay.demo.Programs;
-import okay.std.Await;
-import okay.std.Effects;
+import okay.kernel.std.Await;
+import okay.kernel.std.Effects;
 import okay.std.Handlers;
-import okay.std.Tell;
+import okay.kernel.std.Tell;
 import scala.Tuple2;
 import scala.collection.immutable.List;
 
@@ -19,7 +19,7 @@ public final class FromJava {
   }
 
   /** Scala 3's `p(1)` under the handlers for Java: its log a `java.util.List`, typed */
-  public static okay.std.Logged<String, Object> scalasUnderJavaTypes(Monad m) {
+  public static okay.kernel.std.Logged<String, Object> scalasUnderJavaTypes(Monad m) {
     Program<Object> p = Programs.p(1);
     Program<Object> withAsync = mm -> mm.handle(Handlers.async(), p);
     return Program.run(mm -> mm.handle(okay.std.JavaHandlers.<String, Object>writer(Effects.writer(String.class)), withAsync), m);

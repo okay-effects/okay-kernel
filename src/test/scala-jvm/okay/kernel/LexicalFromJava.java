@@ -2,9 +2,9 @@ package okay.kernel;
 
 import okay.lexical.*;
 import okay.lexical.Prog;
-import okay.std.Logged;
-import okay.std.Final;
-import okay.std.Result;
+import okay.kernel.std.Logged;
+import okay.kernel.std.Final;
+import okay.kernel.std.Result;
 
 /** THE KERNEL BY LEVELS, FROM JAVA: capabilities checked statically, each reaching its own handler */
 public final class LexicalFromJava {
@@ -44,7 +44,7 @@ public final class LexicalFromJava {
     Program<Object> p = okay.demo.Programs.p(3);
     Program<Object> withAsync = mm -> mm.handle(okay.std.Handlers.async(), p);
     Program<scala.Tuple2<scala.collection.immutable.List<String>, Object>> withLog =
-        mm -> mm.handle(okay.std.Handlers.<String, Object>writer(okay.std.Effects.writer(String.class)), withAsync);
+        mm -> mm.handle(okay.std.Handlers.<String, Object>writer(okay.kernel.std.Effects.writer(String.class)), withAsync);
     return Prog.run(Prog.<Top, scala.Tuple2<scala.collection.immutable.List<String>, Object>>of(withLog), m);
   }
 }
