@@ -87,21 +87,21 @@ here; okay-java stays a library.
 - `okay.jkernel.Steps` (`java/`): the machine in Java, compiled by javac against the API's jar — the same random
   programs, the same outcomes (`TestAgree`, and `AgreeTest` in Java).
 
-## What an adapter costs
+## What the kernel costs
 
 okay-java's mixed program (1000 orders: a reader's base, the first of three suppliers, a failure caught per order, a
-state, a log), written once on the typed view, JDK 26, JMH `-f 2 -wi 5 -i 5`, µs:
+state, a log), written once over `Effects`, on each implementation (bench/, JDK 26, JMH `-f 2 -wi 5 -i 5`):
 
-| | adapter alone | + `Returning` | + `Direct` |
+| implementation | µs | B / order | its own program, in its own words |
 |---|---|---|---|
-| `Steps`, the kernel's machine | 168 | | 170 |
-| `OnCore.zero` | 324 | 279 | 248 |
-| `OnCore.cont` | 292 | | 219 |
-| `OnJava` | 228 | | 204 |
+| okay-java (`okay.core.Kernel`, native) | 245 | 1767 | 182 (okay-java's MixedBenchmark, JDK 26) |
+| okay-core cont (`OnCore.cont`, native) | 314 | 2395 | 142 |
+| okay-core zero (`OnCore.zero`, native) | 348 | 2089 | 125 |
+| steps-java (the reference, Java) | 405 | 2520 | — |
+| steps (the reference, Scala) | 524 | 2414 | — |
 
-The same program in okay-core itself, its own std: 125 on `Cont0`, 142 on `Cont`. The rest of the distance is the
-kernel's handlers (clauses over `Monad`, `k` a kernel `Prog`) and a program's functions crossing the API.
-
+The implementations' own typed programs are unchanged by implementing the kernel (okay-core's changelog.d/kernel-native.md,
+okay-java's docs/kernel.md). The kernel's path on okay-core is being made faster.
 ## Scala 3's typed view (`okay`, `okay.std`)
 
 `A ! R` is `Eff[R, A]`, a `Program[A]` with its effects in its type: `R` an intersection, `Writer % String + Async`
