@@ -80,7 +80,7 @@ interface Answers         { boolean answers(Type effect); <X> X value(Op<X> op);
   operations, `Cancelled` at the end, `Failed` if one failed. It cannot be caught (a `catch` swallowing a
   cancellation is how cancellation breaks). A multi-shot `k`: cancelling one resumption cancels that path, its
   finalizers once a path. An implementation with no finalizers answers `Cancelled` at once. Regions where
-  cancellation waits (`uncancelable`, so that `bracket` is safe): proposed for version 1 (§8).
+  cancellation waits (`uncancelable`, so that `bracket` is safe): in version 1.
 
 | what | as | caught |
 |---|---|---|
@@ -88,8 +88,8 @@ interface Answers         { boolean answers(Type effect); <X> X value(Op<X> op);
 | a failure | `Failed`, `k.fail` | yes |
 | a cancellation | `Cancelled`, `k.cancel` | no: finalizers only |
 
-Proposed, to decide (§8): the program's runtime row, `Computation.effects(): Set<Type>`, checked at the border;
-an operation's value type, `Op.value(): Type`, checked in a debug mode.
+Decided (§8): the program's runtime row, `Computation.effects(): Set<Type>`, checked at the border; an operation's
+value type, `Op.value(): Type`, checked in a debug mode.
 
 ## 3a. Written once: `Effects` and the shapes of handlers
 
@@ -134,10 +134,11 @@ the same operation outward (`e.perform(op)`): a clause runs outside its handler.
 
 **`Direct`, the fast path.** `Prog<A>` is the kernel's interface; an implementation's nodes do not know it, so its
 bridge wraps each and translates each bind — the cost of code written once. An implementation may implement
-`Direct` beside `Effects`: the same operations on its own programs, untyped (`Any`), so code written once is built
+`Direct` beside `Effects` — an interface of its own, not an `Effects` (code written once asks `e instanceof Direct`):
+the same operations on its own programs, untyped (`Any`), so code written once is built
 in its nodes directly, a bind's function passed as it is, wrapped only at the edges (a clause, another's program).
 Measured (the mixed program, µs for 1000 orders): okay-core's `zero` 279 → 248, `cont` 284 → 219, okay-java 224 →
-204. Proposed in the API from the first (§8).
+204. In the API from the first.
 
 Not written once, by design: the fronts (`A ! E1 + E2`, enums and matches, Java's capabilities), the machines, the
 platform (threads, timers: a hook), and programs where speed matters — they run on their implementation's own machine.
@@ -181,16 +182,12 @@ Moved back where it belongs: `OnCore` to okay-core's bridge, `OnJava` to okay-ja
 each a module of its own beside the API: the kernel's machine of steps (Scala, and its Java one), the typed view of
 Scala 3, `lexical`, `Cont` in Java.
 
-## 8. Still to decide
+## 8. Decided
 
-1. The runtime row, `Computation.effects()`: proposed yes — a check at the border, an early error in place of "no
-   handler" deep inside.
-2. An operation's value type, `Op.value()`: proposed yes, checked in a debug mode only.
-3. `Direct` in the API from the first, beside `Effects`: proposed yes.
-4. `uncancelable` regions in version 1: proposed yes — without them `bracket` is not safe.
-
-Decided: `Effects` its name; control (`shift0`, `$`) its methods; `Aborting` a shape; failures and cancellation
-outcomes of a step.
+`Effects` its name; control (`shift0`, `$`) its methods; `Aborting` a shape; failures and cancellation outcomes of a
+step; the runtime row `Computation.effects()`, checked at the border; an operation's value type `Op.value()`,
+checked in a debug mode; `Direct` in the API from the first, an interface of its own; `uncancelable` regions in
+version 1.
 
 ## 9. The plan
 
