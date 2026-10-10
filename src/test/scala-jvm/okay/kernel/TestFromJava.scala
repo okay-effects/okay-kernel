@@ -1,0 +1,17 @@
+package okay.kernel
+
+import okay.{!, %, +, Eff}
+import okay.std.*
+
+/** programs of Java and Scala 3 in one, both ways, on every monad */
+abstract class TestFromJava(m: Monad) extends munit.FunSuite:
+  test("a program written in Java, under Scala 3's typed handlers") {
+    val q: Int ! Writer % String + Async = Eff.from(FromJava.q(2).asInstanceOf[Program[Int]])
+    assertEquals(Eff.run(writer(async(q)), m), (List("java 2"), 21))
+  }
+  test("Scala 3's program, its handlers installed from Java") {
+    assertEquals(FromJava.scalasUnderJavas(m), (List("got 1", "awaited 2"), 4))
+  }
+
+class TestFromJavaSteps extends TestFromJava(Steps)
+class TestFromJavaRef extends TestFromJava(Ref)
