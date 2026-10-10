@@ -1,5 +1,9 @@
 # okay-kernel
 
+> **Being redesigned as a protocol**: [docs/design.md](docs/design.md). What follows is the kernel before it, now in
+> `legacy/` (the first API, its machines, the typed view, the bridges), unchanged until each part moves onto the new
+> API (`api/`). `sbt legacy/test` runs it.
+
 One kernel API for effects, handlers and continuations, the same in every language and on every platform, every
 monad an implementation of it.
 

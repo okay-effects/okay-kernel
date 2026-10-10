@@ -5,14 +5,18 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 // okay-java: `./gradlew publishToMavenLocal`, to ~/.m2)
 ThisBuild / resolvers += Resolver.mavenLocal
 
+// THE KERNEL BEFORE THE PROTOCOL (legacy/): the first API (Monad, Program.in, Effect by strings) and what is built on
+// it — machines, the typed view, the bridges — unchanged, beside the new API (docs/design.md) until each is moved onto
+// it; never on one classpath with it, its artifacts `*-legacy`
+
 /**
  * THE KERNEL API, BINARY: pure Java, no dependency — `dev.okay:okay-kernel-api`. The JVM's implementations, this
  * one's Scala and its Java (`java/`), compiled against it: one class an interface, an operation, an answer — a program,
  * a handler, a monad of one works with those of another
  */
-lazy val api = (project in file("api"))
+lazy val legacyApi = (project in file("legacy/api"))
   .settings(
-    name := "okay-kernel-api",
+    name := "okay-kernel-api-legacy",
     crossPaths := false,
     autoScalaLibrary := false,
     javacOptions ++= Seq("--release", "17"),
@@ -23,10 +27,10 @@ lazy val api = (project in file("api"))
  * `Async` in Java — pure Java, on the API alone (`dev.okay:okay-kernel-java`). Here, not in okay-java: okay-java and
  * okay-core stay libraries of no dependency, the kernel the layer over them
  */
-lazy val kernelJava = (project in file("java"))
-  .dependsOn(api)
+lazy val legacyJava = (project in file("legacy/java"))
+  .dependsOn(legacyApi)
   .settings(
-    name := "okay-kernel-java",
+    name := "okay-kernel-java-legacy",
     crossPaths := false,
     autoScalaLibrary := false,
     javacOptions ++= Seq("--release", "21", "-Xlint:all", "-Xlint:-serial"),
@@ -43,14 +47,14 @@ def mirror(base: File) = base.getParentFile / "src" / "main" / "scala-mirror"
  * THE KERNEL, CROSS-BUILT: the JVM, Scala.js, Scala Native — one source tree, `src/`, shared; the JVM's own tests
  * (Java's among them) in `src/test/scala-jvm`. On the JVM the API is `api`'s jar, elsewhere its mirror
  */
-lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
+lazy val legacyCore = crossProject(JVMPlatform, JSPlatform, NativePlatform)
   .crossType(CrossType.Pure)
-  .in(file("."))
+  .in(file("legacy/core"))
   .settings(
-    name := "okay-kernel",
+    name := "okay-kernel-legacy",
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test
   )
-  .jvmConfigure(_.dependsOn(api, kernelJava % Test))
+  .jvmConfigure(_.dependsOn(legacyApi, legacyJava % Test))
   .jsSettings(Compile / unmanagedSourceDirectories += mirror(baseDirectory.value))
   .nativeSettings(Compile / unmanagedSourceDirectories += mirror(baseDirectory.value))
   .jvmSettings(
@@ -63,8 +67,8 @@ lazy val core = crossProject(JVMPlatform, JSPlatform, NativePlatform)
 lazy val Scala3Stdlib = config("scala3Stdlib").hide
 
 /** SCALA 2.13 READING THE KERNEL by its TASTy: 2.13's stdlib first, Scala 3.9's behind it (okay-core's recipe) */
-lazy val scala2 = (project in file("scala2"))
-  .dependsOn(core.jvm)
+lazy val legacyScala2 = (project in file("legacy/scala2"))
+  .dependsOn(legacyCore.jvm)
   .settings(
     scalaVersion := "2.13.18",
     projectDependencies ~= (_.map(_.exclude("org.scala-lang", "scala-library").exclude("org.scala-lang", "scala3-library_3"))),
@@ -82,9 +86,9 @@ lazy val scala2 = (project in file("scala2"))
 
 /** THE KERNEL'S MONADS ON OKAY-CORE: its machines `zero` and `cont`, the kernel's suites on them (okay-core
  * published locally: `sbt coreJVM/publishLocal` in okay-core) */
-lazy val okaycore = (project in file("okaycore"))
+lazy val legacyOkaycore = (project in file("legacy/okaycore"))
   .enablePlugins(JmhPlugin)
-  .dependsOn(core.jvm % "compile->compile;test->test", kernelJava % Test)
+  .dependsOn(legacyCore.jvm % "compile->compile;test->test", legacyJava % Test)
   .settings(
     libraryDependencies ++= Seq("okay-core" %% "okay-core" % "0.1.0-SNAPSHOT", "org.scalameta" %% "munit" % "1.2.3" % Test),
     Test / fork := true,
@@ -92,14 +96,18 @@ lazy val okaycore = (project in file("okaycore"))
 
 /** THE KERNEL'S MONAD ON OKAY-JAVA: its machine of prompts, the kernel's suites on it (okay-java published locally:
  * `./gradlew publishToMavenLocal` in okay-java) */
-lazy val okayjava = (project in file("okayjava"))
-  .dependsOn(core.jvm % "compile->compile;test->test", kernelJava % Test)
+lazy val legacyOkayjava = (project in file("legacy/okayjava"))
+  .dependsOn(legacyCore.jvm % "compile->compile;test->test", legacyJava % Test)
   .settings(
     libraryDependencies ++= Seq("dev.okay" % "okay-java" % "0.1.0-SNAPSHOT", "org.scalameta" %% "munit" % "1.2.3" % Test),
     Test / fork := true,
     publish / skip := true)
 
 lazy val root = (project in file("."))
-  .aggregate(api, kernelJava, core.jvm, core.js, core.native, scala2, okaycore, okayjava)
+  .aggregate(legacy)
+  .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
+
+lazy val legacy = (project in file("legacy"))
+  .aggregate(legacyApi, legacyJava, legacyCore.jvm, legacyCore.js, legacyCore.native, legacyScala2, legacyOkaycore, legacyOkayjava)
   // the aggregate only: the sources are the cross-project's
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
