@@ -180,6 +180,20 @@ lazy val tck = (project in file("tck"))
     Test / fork := true)
 
 /**
+ * OKAY ON THE KERNEL: okay's machine (okay-cont's `Cont`, `okay.Effects.machine`'s) as an implementation of `Effects`
+ * (`OnOkay`), okay's own programs exported as computations and computations imported as okay's (docs/okay.md). okay
+ * published locally (okayContJVM and okayJVM publishLocal, docs/okay.md): `dev.okay::okay-kernel-okay`
+ */
+lazy val okayCompat = (project in file("okay"))
+  .dependsOn(api, tck % Test, steps.jvm % Test, stepsJava % Test)
+  .settings(
+    name := "okay-kernel-okay",
+    scalacOptions ++= Seq("-deprecation"),
+    resolvers += Resolver.defaultLocal,
+    libraryDependencies ++= Seq("io.github.sergey-scherbina" %% "okay" % "0.2.0-SNAPSHOT", "org.scalameta" %% "munit" % "1.2.3" % Test),
+    Test / fork := true)
+
+/**
  * EVERY IMPLEMENTATION IN ONE PROCESS: the TCK on each implementation's bridge, published locally from its own
  * repository (okay-java: `./gradlew publishToMavenLocal`; okay-core: `sbt kernel/publishM2`), nesting through the
  * others. Tests only, not published
@@ -201,7 +215,7 @@ lazy val bench = (project in file("bench"))
     publish / skip := true)
 
 lazy val root = (project in file("."))
-  .aggregate(api, scalaApi.jvm, scalaApi.js, scalaApi.native, steps.jvm, steps.js, steps.native, stepsJava, tck, legacy)
+  .aggregate(api, scalaApi.jvm, scalaApi.js, scalaApi.native, steps.jvm, steps.js, steps.native, stepsJava, tck, okayCompat, legacy)
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
 
 lazy val legacy = (project in file("legacy"))
