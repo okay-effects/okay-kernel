@@ -117,12 +117,12 @@ trait General[A, R] extends Handler[A, R] {
 }
 
 trait Direct {
-  def pure(a: Any): Any
-  def flatMap(p: Any, f: Fn[Any, Any]): Any
-  def map(p: Any, f: Fn[Any, Any]): Any
-  def delay(p: Thunk[Any]): Any
-  def perform(op: Op[?]): Any
-  def handle(h: Handler[?, ?], body: Program[?]): Any
+  def directPure(a: Any): Any
+  def directFlatMap(p: Any, f: Fn[Any, Any]): Any
+  def directMap(p: Any, f: Fn[Any, Any]): Any
+  def directDelay(p: Thunk[Any]): Any
+  def directPerform(op: Op[?]): Any
+  def directHandle(h: Handler[?, ?], body: Program[?]): Any
   def prog[A](p: Any): Prog[A]
   def unprog(p: Prog[?]): Any
 }
