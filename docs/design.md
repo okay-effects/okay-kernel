@@ -49,11 +49,22 @@ up to a depth (`Deep`, 32), past it pushed. Multi-shot `k`. No threads, so it is
 
 ## 3. Layer 2: effects
 
-**Effects are first-order types.** An effect is a type of kind `*`: `State[S]`, `Reader[R]`, `Writer[W]`. An
-operation is `Op[E, X]`: of the effect `E`, its value `X` (`Get[S] extends Op[State[S], S]`). So no higher kinds
-anywhere: Scala 2 needs no type lambdas, and Java writes the same types.
+**Effects are GADTs, first-order in rows, matched exhaustively.** An effect is a sealed family of operations, as
+always: `State[S, X]`, its cases `Get[S]() extends State[S, S]`, `Put[S](s: S) extends State[S, Unit]`, each
+`Op[X]` of its value. In a row it is `State[S, ?]`: a type of kind `*`, so no higher kinds anywhere — Scala 2 needs no
+type lambdas, Java writes the same types (`State<S, ?>`). A clause is total and typed in every language, with no
+cast (prototyped: Scala 3, Scala 2.13, Java 25, `-Werror` / `-Xlint:all`):
 
-**A row is a list in the type, a set in its meaning.** `R = E1 :: E2 :: Nil`, each element `E @ (I, O)`: the effect
+- the portable form, in Scala 3, Scala 2 and Java alike: each effect has its CASES AS A VISITOR,
+  `Cases[S, X, R] { def get(value: Same[S, X]): R; def put(s: S, value: Same[Unit, X]): R }`, each case's
+  `fold(c)` calling its own method with `Refl` — a handler that misses a case does not compile (an abstract method
+  not implemented), and `value(s)` gives the operation's value its type `X`. `Same[A, B]` is sealed, its only case
+  `Refl[A] extends Same[A, A]`, `apply` the identity: no cast, in Java either;
+- Scala 3's own, in its front: `op match { case Get() => k(s); case Put(v) => k(()) }` on `State[S, ?] & Op[X]`, `Op`
+  covariant — the compiler refines `X` from the case and checks the match exhaustive (non-exhaustive is an error
+  under `-Werror`). Scala 2 does not refine `X` there, so the portable code uses the visitor.
+
+**A row is a list in the type, a set in its meaning.** `R = E1 :: E2 :: Nil` (`State[Int, ?] :: Reader[String, ?] :: Nil`), each element `E @ (I, O)`: the effect
 with the answer types of its handler's level, `I` the rest's and `O` the whole's. `E` alone means any answer,
 unchanged (`I = O`, polymorphic). What a program may perform is given by two proofs, found by the compiler in Scala
 3 and Scala 2 and passed in Java:
