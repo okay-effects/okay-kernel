@@ -1,8 +1,24 @@
 # okay-kernel
 
-> **Being redesigned as a protocol**: [docs/design.md](docs/design.md). What follows is the kernel before it, now in
-> `legacy/` (the first API, its machines, the typed view, the bridges), unchanged until each part moves onto the new
-> API (`api/`). `sbt legacy/test` runs it.
+## The kernel: a protocol
+
+okay-kernel is the PROTOCOL by which implementations of effects and delimited control — okay's, okay-core's,
+okay-java's, systems to come — work with each other in one process: a program written in one language runs under
+handlers written in another. The design: [docs/design.md](docs/design.md).
+
+| module | what |
+|---|---|
+| `api` (`okay-kernel-api`) | the protocol and the API, pure Java, no dependency: `Type` (an effect's exact identity), `Op`, `Computation`, `Step` (`Done`, `Yield`, `Failed`, `Cancelled`), `Resume` (`resume`, `fail`, `cancel`), `Answers`; code written once over `Effects`; the shapes of handlers; `Direct`; the vocabulary of standard effects and its handlers written once (`std.Handlers`) |
+| `scala` (`okay-kernel-scala`) | Scala's own: `TypeOf` (exact types found by the compiler), `@@`; on Scala.js and Scala Native the API's mirror. Scala 3 and 2.13 from one source |
+| `steps` (`okay-kernel-steps`) | the reference machine: `Effects` and the protocol, exact rather than fast. Scala 3 and 2.13, JVM, JS, Native |
+| `steps-java` (`okay-kernel-steps-java`) | the reference machine in pure Java |
+| `tck` (`okay-kernel-tck`) | what every implementation is checked by, on its own `Effects`: laws, standard handlers, the protocol, nesting through implementations, a thousand random programs with one digest |
+| `legacy/` | the kernel before the protocol, unchanged, until each part moves onto the API or to its own repository (`sbt legacy/test`) |
+
+Implementations bridge to it from their own repositories, as optional modules: okay-core (`okay-core-kernel`),
+okay-java (`okay-java-kernel`).
+
+What follows describes the kernel before the protocol, now in `legacy/`.
 
 One kernel API for effects, handlers and continuations, the same in every language and on every platform, every
 monad an implementation of it.
