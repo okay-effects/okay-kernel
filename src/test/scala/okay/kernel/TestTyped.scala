@@ -37,7 +37,7 @@ object TestTyped:
 
   def asking[A](n: Int): TypedAnswering[Asks, A, A, Any] = new TypedAnswering[Asks, A, A, Any](asks):
     def ret(a: A): A ! Any = Eff.pure(a)
-    def answer[X](op: Op[X]): X = op match
+    def value[X](op: Op[X]): X = op match
       case Ask() => n
 
   def noting[A]: Typed[Notes, A, (List[String], A), Any] = new Typed[Notes, A, (List[String], A), Any](notes):

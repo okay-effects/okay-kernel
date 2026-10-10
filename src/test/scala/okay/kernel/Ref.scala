@@ -6,12 +6,12 @@ package okay.kernel
  * Recursive, not in constant stack: what every monad must agree with, on programs small enough
  */
 object Ref extends Monad:
-  private sealed trait N
+  private sealed trait N extends Prog[Any]
   private final case class Pure(a: Any) extends N
   private final case class FlatMap(m: N, f: Fn[Any, Any]) extends N
   private final case class Delay(p: Thunk[Any]) extends N
   private final case class Perform(op: Op[?]) extends N
-  private final case class Handle(h: Handler, body: Program[?]) extends N
+  private final case class Handle(h: Handler[Any, Any], body: Program[?]) extends N
   private final case class Resumed(r: () => Res) extends N
 
   private enum Res:
@@ -19,24 +19,25 @@ object Ref extends Monad:
     case Cap(op: Op[?], k: Any => Res)
   import Res.*
 
-  def pure(a: Any): Any = Pure(a)
-  def flatMap(p: Any, f: Fn[Any, Any]): Any = FlatMap(p.asInstanceOf[N], f)
-  def delay(p: Thunk[Any]): Any = Delay(p)
-  def perform(op: Op[?]): Any = Perform(op)
-  def handle(h: Handler, body: Program[?]): Any = Handle(h, body)
-  def run(p: Any): Any = eval(p.asInstanceOf[N]) match
-    case Done(v) => v
+  private def typed[A](n: N): Prog[A] = n.asInstanceOf[Prog[A]]
+  def pure[A](a: A): Prog[A] = typed(Pure(a))
+  def flatMap[A, B](p: Prog[A], f: Fn[A, Prog[B]]): Prog[B] = typed(FlatMap(p.asInstanceOf[N], f.asInstanceOf[Fn[Any, Any]]))
+  def delay[A](p: Thunk[Prog[A]]): Prog[A] = typed(Delay(p.asInstanceOf[Thunk[Any]]))
+  def perform[X](op: Op[X]): Prog[X] = typed(Perform(op))
+  def handle[A, R](h: Handler[A, R], body: Program[A]): Prog[R] = typed(Handle(h.asInstanceOf[Handler[Any, Any]], body))
+  def run[A](p: Prog[A]): A = eval(p.asInstanceOf[N]) match
+    case Done(v) => v.asInstanceOf[A]
     case Cap(op, _) => throw IllegalStateException(s"an operation of ${op.effect} with no handler of it in force")
 
   private def andThen(r: Res, g: Any => Res): Res = r match
     case Done(v) => g(v)
     case Cap(op, k) => Cap(op, x => andThen(k(x), g))
 
-  private def delimit(h: Handler, r: Res): Res = r match
+  private def delimit(h: Handler[Any, Any], r: Res): Res = r match
     case Done(v) => eval(h.ret(v, Ref).asInstanceOf[N])
     case Cap(op, k) if op.effect eq h.effect =>
-      val kk: Fn[Any, Any] = x => Resumed(() => delimit(h, k(x)))
-      eval(h.apply(op, kk, Ref).asInstanceOf[N])
+      val kk: Fn[Any, Prog[Any]] = x => typed(Resumed(() => delimit(h, k(x))))
+      eval(h.apply[Any](op.asInstanceOf[Op[Any]], kk, Ref).asInstanceOf[N])
     case Cap(op, k) => Cap(op, x => delimit(h, k(x)))
 
   private def eval(n: N): Res = n match

@@ -1,16 +1,17 @@
 package okay.kernel
 
 /**
- * THE KERNEL API: what every language and every platform works with, and every monad implements.
+ * THE KERNEL API: what every language and every platform works with, and every monad implements — typed through,
+ * by plain generics only, so Scala 3, Scala 2 and Java read it alike.
  *
- * A program is a RECIPE, `Program[A]`: given a monad, it builds itself in it. So a program written in one language
- * runs in any monad, and is called from any language: from Scala 3, Scala 2, Java, Scala.js, Scala Native alike.
- * Operations are data (`Op`), of an effect (`Effect`); a handler (`Handler`) takes the operations of its effect,
- * the nearest in force. A monad (`Monad`) is an implementation: its programs, its machine, its speed — nothing a
- * program sees changes from one monad to another.
+ * A program is a RECIPE, `Program[A]`: given a monad, it builds itself in it, a `Prog[A]` of that monad's. So a
+ * program written in one language runs in any monad and is called from any language. Operations are data (`Op[X]`,
+ * of value `X`), of an effect (`Effect`); a handler (`Handler[A, R]`) takes the operations of its effect, the nearest
+ * in force, the body's value `A` to its answer `R`. A monad (`Monad`) is an implementation: its programs, its
+ * machine, its speed — nothing a program sees changes from one monad to another.
  *
- * The signatures: plain generics and single-abstract-method traits only — no context function, union, type member,
- * higher kind, nor `scala.Function1`. Programs inside a monad are `Any`: each monad its own representation.
+ * A `Prog[A]` is its monad's: built by it, given back to it only — a monad's type is not in it, for Java has no
+ * type of a type constructor. No context function, union, type member, higher kind, nor `scala.Function1`.
  */
 
 /** a function: a lambda of Scala 3, Scala 2 or Java */
@@ -58,41 +59,45 @@ object Effect:
       case "void" => "scala.runtime.BoxedUnit"
       case n => n
 
-/** AN OPERATION of an effect, as data, its value `A` */
-trait Op[A]:
+/** AN OPERATION of an effect, as data, its value `X` */
+trait Op[X]:
   def effect: Effect
 
-/** A HANDLER of an effect: the body's value through `ret`, an operation through its clause, `k` the rest of the body
- * up to the handler, the handler included (deep), any number of times. The clause runs outside the handler, in its
- * place: an operation of the same effect there goes to the next one out. Its programs built in the monad given */
-trait Handler:
+/** A PROGRAM OF A MONAD: built by it, of value `A`, given back to it only */
+trait Prog[A]
+
+/** A HANDLER of an effect: the body's value `A` through `ret` to its answer `R`; an operation through its clause,
+ * `k` the rest of the body up to the handler, the handler included (deep), any number of times, from anywhere —
+ * typed by the operation's value. The clause runs outside the handler, in its place: an operation of the same effect
+ * there goes to the next one out. Its programs built in the monad given */
+trait Handler[A, R]:
   def effect: Effect
-  def ret(a: Any, m: Monad): Any
-  def apply(op: Op[?], k: Fn[Any, Any], m: Monad): Any
+  def ret(a: A, m: Monad): Prog[R]
+  def apply[X](op: Op[X], k: Fn[X, Prog[R]], m: Monad): Prog[R]
 
-/** a TAIL-RESUMPTIVE handler: each clause is `k(value(op))` — answered in place, no capture */
-trait Answering extends Handler:
-  def value(op: Op[?]): Any
-  def apply(op: Op[?], k: Fn[Any, Any], m: Monad): Any = k(value(op))
+/** a TAIL-RESUMPTIVE handler: each clause `k(value(op))` — answered in place, no capture */
+trait Answering[A, R] extends Handler[A, R]:
+  def value[X](op: Op[X]): X
+  def apply[X](op: Op[X], k: Fn[X, Prog[R]], m: Monad): Prog[R] = k(value(op))
 
-/** A MONAD: an implementation of the kernel — programs of its own (`Any`), and their run */
+/** A MONAD: an implementation of the kernel — its programs, and their run */
 trait Monad:
-  def pure(a: Any): Any
-  def flatMap(p: Any, f: Fn[Any, Any]): Any
-  def map(p: Any, f: Fn[Any, Any]): Any = flatMap(p, a => pure(f(a)))
+  def pure[A](a: A): Prog[A]
+  def flatMap[A, B](p: Prog[A], f: Fn[A, Prog[B]]): Prog[B]
+  def map[A, B](p: Prog[A], f: Fn[A, B]): Prog[B] = flatMap(p, a => pure(f(a)))
   /** a program built when it is run: a tail call */
-  def delay(p: Thunk[Any]): Any
+  def delay[A](p: Thunk[Prog[A]]): Prog[A]
   /** an operation, to the nearest handler of its effect in force */
-  def perform(op: Op[?]): Any
+  def perform[X](op: Op[X]): Prog[X]
   /** a program under a handler: built in this monad when the run enters it */
-  def handle(h: Handler, body: Program[?]): Any
+  def handle[A, R](h: Handler[A, R], body: Program[A]): Prog[R]
   /** the program's value; a failure, thrown — no handler for an operation among them */
-  def run(p: Any): Any
+  def run[A](p: Prog[A]): A
 
 /** A PROGRAM: a recipe, built in any monad — what `A ! Es` is at run time, in every language */
 trait Program[A]:
-  def in(m: Monad): Any
+  def in(m: Monad): Prog[A]
 
 object Program:
   /** a program run in a monad: its value */
-  def run[A](p: Program[A], m: Monad): A = m.run(p.in(m)).asInstanceOf[A]
+  def run[A](p: Program[A], m: Monad): A = m.run(p.in(m))

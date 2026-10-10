@@ -10,7 +10,7 @@ package okay.kernel
 object Steps extends Monad:
 
   // THE NODES: this monad's programs
-  private sealed abstract class Node:
+  private sealed abstract class Node extends Prog[Any]:
     def step(r: Run): Node
   private final class Return(val value: Any) extends Node:
     def step(r: Run): Node = r.value(value)
@@ -25,30 +25,31 @@ object Steps extends Monad:
   /** an operation bound: one node */
   private final class Suspend(val op: Op[?], val k: Fn[Any, Any]) extends Node:
     def step(r: Run): Node = r.perform(op, k)
-  private final class Handle(val h: Handler, val body: Program[?]) extends Node:
+  private final class Handle(val h: Handler[Any, Any], val body: Program[?]) extends Node:
     def step(r: Run): Node = r.handle(this, null)
   /** a captured rest resumed with `x`: `k` frames or a function, `upTo` its handler if none crossed, else the Kont */
   private final class Resume(val x: Any, val k: AnyRef, val upTo: AnyRef) extends Node:
     def step(r: Run): Node = r.resume(this, null)
 
   private inline def node(p: Any): Node = p.asInstanceOf[Node]
+  private inline def typed[A](n: Node): Prog[A] = n.asInstanceOf[Prog[A]]
 
-  def pure(a: Any): Any = Return(a)
-  def flatMap(p: Any, f: Fn[Any, Any]): Any = p match
-    case o: Perform => Suspend(o.op, f)
-    case n => Bind(node(n), f)
-  override def map(p: Any, f: Fn[Any, Any]): Any = MapN(node(p), f)
-  def delay(p: Thunk[Any]): Any = Delay(p)
-  def perform(op: Op[?]): Any = Perform(op)
-  def handle(h: Handler, body: Program[?]): Any = Handle(h, body)
+  def pure[A](a: A): Prog[A] = typed(Return(a))
+  def flatMap[A, B](p: Prog[A], f: Fn[A, Prog[B]]): Prog[B] = typed(p match
+    case o: Perform => Suspend(o.op, f.asInstanceOf[Fn[Any, Any]])
+    case n => Bind(node(n), f.asInstanceOf[Fn[Any, Any]]))
+  override def map[A, B](p: Prog[A], f: Fn[A, B]): Prog[B] = typed(MapN(node(p), f.asInstanceOf[Fn[Any, Any]]))
+  def delay[A](p: Thunk[Prog[A]]): Prog[A] = typed(Delay(p.asInstanceOf[Thunk[Any]]))
+  def perform[X](op: Op[X]): Prog[X] = typed(Perform(op))
+  def handle[A, R](h: Handler[A, R], body: Program[A]): Prog[R] = typed(Handle(h.asInstanceOf[Handler[Any, Any]], body))
 
   private val Done: Node = Return(null)
 
-  def run(p: Any): Any =
+  def run[A](p: Prog[A]): A =
     val r = Run()
     var c = node(p)
     while c ne Done do c = c.step(r)
-    r.result
+    r.result.asInstanceOf[A]
 
   // THE STACK
   private sealed abstract class Frames
@@ -59,7 +60,7 @@ object Steps extends Monad:
   private sealed abstract class Meta
   private object TopMeta extends Meta
   /** a handler in force: the function its answer is bound to if any, the frames outside it, the handlers further out */
-  private final class Seg(val h: Handler, val bound: Fn[Any, Any] | Null, val outer: Frames, val next: Meta) extends Meta
+  private final class Seg(val h: Handler[Any, Any], val bound: Fn[Any, Any] | Null, val outer: Frames, val next: Meta) extends Meta
   /** the first `n` handlers of `m`, then `tail`: a resumed continuation's, shared, not copied */
   private final class Take(val m: Meta, val n: Int, val tail: Meta) extends Meta
 
@@ -117,8 +118,8 @@ object Steps extends Monad:
     i
 
   /** a captured continuation: the rest (frames or a function), the handlers crossed and the one captured up to */
-  private final class Kont(val k: AnyRef, val ms: Meta, val n: Int) extends Fn[Any, Any]:
-    def apply(x: Any): Any = Resume(x, k, if n == 0 && ms.isInstanceOf[Seg] then ms else this)
+  private final class Kont(val k: AnyRef, val ms: Meta, val n: Int) extends Fn[Any, Prog[Any]]:
+    def apply(x: Any): Prog[Any] = Resume(x, k, if n == 0 && ms.isInstanceOf[Seg] then ms else this)
     def up: Seg = if n == 0 && ms.isInstanceOf[Seg] then ms.asInstanceOf[Seg] else head(drop(ms, n))
 
   private final class Run:
@@ -155,13 +156,13 @@ object Steps extends Monad:
         case near: Seg if near.h.effect eq e => d = near
         case _ => i = index(ms, e); d = head(drop(ms, i))
       d.h match
-        case a: Answering =>
-          val v = a.value(op)
+        case a: Answering[?, ?] =>
+          val v = a.asInstanceOf[Answering[Any, Any]].value[Any](op.asInstanceOf[Op[Any]])
           if bound == null then value(v) else node(bound(v))
         case h =>
           val kk: AnyRef = if bound == null then k else if k eq End then bound else Then(bound, k)
           val kont = Kont(kk, ms, i)
-          var c = node(h.apply(op, kont, Steps))
+          var c = node(h.apply[Any](op.asInstanceOf[Op[Any]], kont, Steps))
           ms = if i == 0 && (ms eq d) then d.next else drop(ms, i + 1)
           k = d.outer
           val b = d.bound

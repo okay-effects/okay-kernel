@@ -1,7 +1,7 @@
 package okay
 
 import scala.annotation.unchecked.uncheckedVariance
-import okay.kernel.{Fn, Handler, Monad, Op, Program, Steps}
+import okay.kernel.{Handler as KHandler, Monad, Op, Prog, Program, Steps}
 
 /** an effect of a type parameter in a row: `Writer % String` */
 infix type %[E[_], T] = E[T]
@@ -17,25 +17,27 @@ infix type ![A, R] = Eff[R, A]
  * effects is one needing more. Its nodes, a class each: written, one object a step, no closure — built in a monad,
  * one closure a bind */
 sealed abstract class Eff[-R, +A] extends Program[A @uncheckedVariance]:
-  def flatMap[R2, B](f: A => Eff[R2, B]): Eff[R & R2, B] = Eff.FlatMap(this, f.asInstanceOf[Any => Eff[Any, Any]])
-  def map[B](f: A => B): Eff[R, B] = Eff.MapE(this, f.asInstanceOf[Any => Any])
+  def flatMap[R2, B](f: A => Eff[R2, B]): Eff[R & R2, B] = Eff.FlatMap(this, f)
+  def map[B](f: A => B): Eff[R, B] = Eff.MapE(this, f)
   def andThen[R2, B](next: Eff[R2, B]): Eff[R & R2, B] = flatMap(_ => next)
 
 object Eff:
   private final class PureE[A](a: A) extends Eff[Any, A]:
-    def in(m: Monad): Any = m.pure(a)
-  private final class FlatMap[R, A, B](p: Eff[R, A], f: Any => Eff[Any, Any]) extends Eff[R, B]:
-    def in(m: Monad): Any = m.flatMap(p.in(m), a => f(a).in(m))
-  private final class MapE[R, A, B](p: Eff[R, A], f: Any => Any) extends Eff[R, B]:
-    def in(m: Monad): Any = m.map(p.in(m), a => f(a))
+    def in(m: Monad): Prog[A] = m.pure(a)
+  private final class FlatMap[R, A, B](p: Eff[R, A], f: A => Eff[?, B]) extends Eff[R, B]:
+    def in(m: Monad): Prog[B] = m.flatMap(p.in(m), a => f(a).in(m))
+  private final class MapE[R, A, B](p: Eff[R, A], f: A => B) extends Eff[R, B]:
+    def in(m: Monad): Prog[B] = m.map(p.in(m), a => f(a))
   private final class DelayE[R, A](p: () => Eff[R, A]) extends Eff[R, A]:
-    def in(m: Monad): Any = m.delay(() => p().in(m))
+    def in(m: Monad): Prog[A] = m.delay(() => p().in(m))
   private final class PerformE[R, A](op: Op[A]) extends Eff[R, A]:
-    def in(m: Monad): Any = m.perform(op)
-  private final class HandleE[R, B](h: Handler, p: Program[?]) extends Eff[R, B]:
-    def in(m: Monad): Any = m.handle(h, p)
+    def in(m: Monad): Prog[A] = m.perform(op)
+  private final class HandleE[R, A, B](h: KHandler[A, B], p: Program[A]) extends Eff[R, B]:
+    def in(m: Monad): Prog[B] = m.handle(h, p)
   private final class From[R, A](p: Program[A]) extends Eff[R, A]:
-    def in(m: Monad): Any = p.in(m)
+    def in(m: Monad): Prog[A] = p.in(m)
+  private final class Lift[R, A](p: Prog[A]) extends Eff[R, A]:
+    def in(m: Monad): Prog[A] = p
 
   def pure[A](a: A): Eff[Any, A] = PureE(a)
   /** a program built when it is run: a tail call */
@@ -43,10 +45,12 @@ object Eff:
   /** an operation of an effect `E`, to the nearest handler of it */
   def perform[E, A](op: Op[A]): Eff[E, A] = PerformE(op)
   /** `p` under a handler of `E`: what is left of its effects, `R` */
-  def handle[E, R, A, B](h: Handler, p: Eff[E & R, A]): Eff[R, B] = HandleE(h, p)
+  def handle[E, R, A, B](h: KHandler[A, B], p: Eff[E & R, A]): Eff[R, B] = HandleE(h, p)
   /** a program of another language as one of Scala 3: its effects as said, `R` — checked at run time */
   def from[R, A](p: Program[A]): Eff[R, A] = p match
     case e: Eff[?, ?] => e.asInstanceOf[Eff[R, A]]
     case _ => From(p)
+  /** a program of the monad being built in, as one of Scala 3: a clause's `k(x)` — run in that monad only */
+  def lift[R, A](p: Prog[A]): Eff[R, A] = Lift(p)
   /** a program needing nothing, run: by the machine of steps, or another monad */
   def run[A](p: Eff[Any, A], m: Monad = Steps): A = Program.run(p, m)

@@ -7,12 +7,12 @@ import okay.kernel.Effect
  * cached: its effects of each kind made once — an operation finds its effect with no string built, no lock taken */
 final class Tag[T] private (val name: String):
   private val effects = new Array[Effect](Tag.Kinds)
-  private val handlers = new Array[okay.kernel.Handler](Tag.Kinds)
+  private val handlers = new Array[AnyRef](Tag.Kinds)
 
   /** a handler of kind `kind` over this type, of no state: made once */
-  def handler(kind: Int, make: => okay.kernel.Handler): okay.kernel.Handler =
+  def handler[H <: AnyRef](kind: Int, make: => H): H =
     val h = handlers(kind)
-    if h != null then h
+    if h != null then h.asInstanceOf[H]
     else
       val made = make
       handlers(kind) = made

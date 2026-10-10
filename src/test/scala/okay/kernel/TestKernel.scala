@@ -33,18 +33,17 @@ abstract class TestKernel(m: Monad, big: Int) extends munit.FunSuite:
     assertEquals(run(writer(q)), (List("outer saw List(inner)"), ()))
   }
 
-  test("multi-shot: a clause resuming twice, each run the handler's again") {
-    object Flip extends Op[Boolean]:
-      def effect: Effect = flip
-    lazy val flip: Effect = Effect("Flip")
-    val all: Handler = new Handler:
-      def effect: Effect = flip
-      def ret(a: Any, mm: Monad): Any = mm.pure(List(a))
-      def apply(op: Op[?], k: Fn[Any, Any], mm: Monad): Any =
-        mm.flatMap(k(true), (a: Any) => mm.map(k(false), (b: Any) => a.asInstanceOf[List[Any]] ++ b.asInstanceOf[List[Any]]))
-    val coins: Program[Any] = mm => mm.flatMap(mm.perform(Flip), x => mm.map(mm.perform(Flip), y => (x, y)))
-    assertEquals(Program.run(new Program[Any] { def in(mm: Monad) = mm.handle(all, coins) }, m),
-      List((true, true), (true, false), (false, true), (false, false)))
+  test("multi-shot: a clause resuming twice, each run the handler's again — on the kernel's typed API") {
+    type P = (Boolean, Boolean)
+    final case class Flip() extends Op[Boolean]:
+      def effect: Effect = TestKernel.flip
+    val all: Handler[P, List[P]] = new Handler[P, List[P]]:
+      def effect: Effect = TestKernel.flip
+      def ret(a: P, mm: Monad): Prog[List[P]] = mm.pure(List(a))
+      def apply[X](op: Op[X], k: Fn[X, Prog[List[P]]], mm: Monad): Prog[List[P]] = op match
+        case Flip() => mm.flatMap(k(true), a => mm.map(k(false), b => a ++ b))
+    val coins: Program[P] = mm => mm.flatMap(mm.perform(Flip()), x => mm.map(mm.perform(Flip()), y => (x, y)))
+    assertEquals(Program.run[List[P]](mm => mm.handle(all, coins), m), List((true, true), (true, false), (false, true), (false, false)))
   }
 
   test("an operation with no handler: an error") {
@@ -124,6 +123,9 @@ abstract class TestKernel(m: Monad, big: Int) extends munit.FunSuite:
     Async.start(await[Int](cb => cb.fail(IllegalStateException("cb"))), m, _ => (), x => e = x)
     assertEquals(e.getMessage, "cb")
   }
+
+object TestKernel:
+  val flip: Effect = Effect("Flip")
 
 class TestKernelSteps extends TestKernel(Steps, 100_000)
 /** the reference, recursive: programs as deep as a platform's stack lets it */

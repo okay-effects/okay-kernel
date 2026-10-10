@@ -1,6 +1,7 @@
 package okay.lexical
 
 import okay.kernel.{Effect, Fn, Handler, Monad, Op, Program, Steps}
+import okay.kernel.Prog as KProg
 import okay.std.{Effects, Get, Handlers, Put, Raise, Tell}
 
 /**
@@ -11,11 +12,11 @@ import okay.std.{Effects, Get, Handlers, Put, Raise, Tell}
  * `Prog` is the kernel's `Program`: run on any monad, mixed with programs of any language.
  */
 final class Prog[L, A] private (private val p: Program[A]) extends Program[A]:
-  def in(m: Monad): Any = p.in(m)
+  def in(m: Monad): KProg[A] = p.in(m)
   /** `f` on this program's value: a program of this level, or of one further out (`? super L` in Java) */
   def flatMap[B](f: Fn[A, Prog[? >: L, B]]): Prog[L, B] =
-    Prog(m => m.flatMap(p.in(m), a => f(a.asInstanceOf[A]).in(m)))
-  def map[B](f: Fn[A, B]): Prog[L, B] = Prog(m => m.map(p.in(m), a => f(a.asInstanceOf[A])))
+    Prog(m => m.flatMap(p.in(m), a => f(a).in(m)))
+  def map[B](f: Fn[A, B]): Prog[L, B] = Prog(m => m.map(p.in(m), f))
   def andThen[B](next: Prog[? >: L, B]): Prog[L, B] = flatMap(_ => next)
   /** this program at a level further in */
   def at[M <: L]: Prog[M, A] = this.asInstanceOf[Prog[M, A]]
@@ -30,7 +31,7 @@ object Prog:
   def run[A](p: Prog[Top, A], m: Monad): A = Program.run(p, m)
 
   /** a handler of a fresh effect, one's own: its handler made for the effect, the body given the capability */
-  def handle[L, A, R](handler: Fn[Effect, Handler], body: Body[L, A]): Prog[L, R] =
+  def handle[L, A, R](handler: Fn[Effect, Handler[A, R]], body: Body[L, A]): Prog[L, R] =
     Prog(m => {
       val e = Effect("lexical")
       m.handle(handler(e), body.in(Cap(e)))
@@ -40,21 +41,21 @@ object Prog:
   def writer[L, W, A](body: WriterBody[L, W, A]): Prog[L, Logged[W, A]] =
     Prog[L, (List[W], A)](m => {
       val e = Effect("Writer")
-      m.handle(Handlers.writer(e), body.in(WriterCap(e)))
+      m.handle(Handlers.writer[W, A](e), body.in(WriterCap(e)))
     }).map { case (log, a) => Logged(javaList(log), a) }
 
   /** a state of a cell, one a run: the final state and the value */
   def state[L, S, A](s0: S, body: StateBody[L, S, A]): Prog[L, Final[S, A]] =
     Prog[L, (S, A)](m => {
       val e = Effect("State")
-      m.handle(Handlers.state(e, s0), body.in(StateCap(e)))
+      m.handle(Handlers.state[S, A](e, s0), body.in(StateCap(e)))
     }).map { case (s, a) => Final(s, a) }
 
   /** the value, or the first failure raised */
   def attempt[L, E, A](body: ThrowsBody[L, E, A]): Prog[L, Result[E, A]] =
     Prog[L, Either[E, A]](m => {
       val e = Effect("Throws")
-      m.handle(Handlers.throws(e), body.in(ThrowsCap(e)))
+      m.handle(Handlers.throws[E, A](e), body.in(ThrowsCap(e)))
     }).map {
       case Right(a) => Result.ok(a)
       case Left(e) => Result.failed(e)
@@ -71,7 +72,7 @@ object Prog:
     def get(): Prog[M, S] = Prog(m => m.perform(Get[S](e)))
     def put(s: S): Prog[M, Unit] = Prog(m => m.perform(Put(s, e)))
   private final class ThrowsCap[M, E](e: Effect) extends Throws[M, E]:
-    def raise[X](err: E): Prog[M, X] = Prog(m => m.perform(Raise(err, e)))
+    def raise[X](err: E): Prog[M, X] = Prog(m => m.perform(Raise(err, e)).asInstanceOf[KProg[X]])
 
 /** the level of the top */
 sealed trait Top

@@ -5,6 +5,8 @@ import okay.std.Await;
 import okay.std.Effects;
 import okay.std.Handlers;
 import okay.std.Tell;
+import scala.Tuple2;
+import scala.collection.immutable.List;
 
 /** THE KERNEL FROM JAVA: a program written in Java, and Scala 3's run from Java under handlers Java installs */
 public final class FromJava {
@@ -17,10 +19,11 @@ public final class FromJava {
   }
 
   /** Scala 3's `p(1)`, its handlers installed from Java, on the monad Java chose */
-  public static Object scalasUnderJavas(Monad m) {
+  public static Tuple2<List<String>, Object> scalasUnderJavas(Monad m) {
     Program<Object> p = Programs.p(1);
     Program<Object> withAsync = mm -> mm.handle(Handlers.async(), p);
-    Program<Object> withLog = mm -> mm.handle(Handlers.writer(Effects.writer(String.class)), withAsync);
+    Program<Tuple2<List<String>, Object>> withLog =
+        mm -> mm.handle(Handlers.<String, Object>writer(Effects.writer(String.class)), withAsync);
     return Program.run(withLog, m);
   }
 }
