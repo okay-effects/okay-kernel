@@ -118,8 +118,27 @@ lazy val api = (project in file("api"))
     libraryDependencies ++= Seq("com.github.sbt.junit" % "jupiter-interface" % "0.19.0" % Test, "org.junit.jupiter" % "junit-jupiter" % "5.13.4" % Test),
     Compile / packageDoc / publishArtifact := false)
 
+/** the API's mirror for Scala.js and Scala Native, where there is no Java: the same names and signatures, in Scala */
+def apiMirror(base: File) = base.getParentFile / "src" / "main" / "scala-mirror"
+
+/**
+ * SCALA'S OWN OVER THE API: exact types found by the compiler (`TypeOf`, `@@`); on Scala.js and Scala Native the API's
+ * mirror too. Scala 3 and Scala 2.13 from one source, the subset they share: `dev.okay::okay-kernel-scala`
+ */
+lazy val scalaApi = crossProject(JVMPlatform, JSPlatform, NativePlatform)
+  .crossType(CrossType.Pure)
+  .in(file("scala"))
+  .settings(
+    name := "okay-kernel-scala",
+    crossScalaVersions := Seq("3.9.0", "2.13.18"),
+    scalacOptions ++= (if (scalaVersion.value.startsWith("2.")) Seq("-Xfatal-warnings", "-deprecation", "-Xsource:3") else Seq("-Werror", "-deprecation")),
+    libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test)
+  .jvmConfigure(_.dependsOn(api))
+  .jsSettings(Compile / unmanagedSourceDirectories += apiMirror(baseDirectory.value))
+  .nativeSettings(Compile / unmanagedSourceDirectories += apiMirror(baseDirectory.value))
+
 lazy val root = (project in file("."))
-  .aggregate(api, legacy)
+  .aggregate(api, scalaApi.jvm, scalaApi.js, scalaApi.native, legacy)
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
 
 lazy val legacy = (project in file("legacy"))

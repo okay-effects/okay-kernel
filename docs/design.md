@@ -161,8 +161,11 @@ standard effects are mapped onto these by its bridge, by identity, only at the b
 okay-kernel/
   api     okay-kernel-api   Type, Op, Computation, Step, Resume, Answers; the vocabulary; Same.
                             A Java jar of no dependency on the JVM; the same API as Scala source on JS and Native
+  scala   okay-kernel-scala Scala's own over the API: TypeOf (exact types found by the compiler), @@; on JS and
+                            Native the API's mirror. One source for Scala 3 and 2.13, on the JVM, JS and Native
   tck     okay-kernel-tck   the protocol's checks: export, import, multi-shot k, a resume from another thread,
                             nesting through three systems; random programs, one digest
+  legacy/ the kernel before the protocol, unchanged, until each part moves onto the API or to its own repository
   …       what has no other home, each a module of its own (§7)
 ```
 
