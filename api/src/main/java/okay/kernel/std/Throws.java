@@ -21,7 +21,9 @@ public final class Throws {
     throw new IllegalArgumentException("not an operation of Throws: " + op);
   }
 
-  public sealed interface Ops<E, X> extends Op<X> permits Raise {
+  /** its operations: the kernel's records below, or an implementation's own — implementing it, its {@code fold}
+   * calling its own case (the TCK checks it) */
+  public interface Ops<E, X> extends Op<X> {
     <R> R fold(Cases<E, X, R> c);
   }
 

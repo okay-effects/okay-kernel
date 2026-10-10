@@ -25,7 +25,9 @@ public final class Control {
     throw new IllegalArgumentException("not an operation of Control: " + op);
   }
 
-  public sealed interface Ops<X> extends Op<X> permits Capture {
+  /** its operations: the kernel's records below, or an implementation's own — implementing it, its {@code fold}
+   * calling its own case (the TCK checks it) */
+  public interface Ops<X> extends Op<X> {
     <R> R fold(Cases<X, R> c);
   }
 

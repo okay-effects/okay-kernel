@@ -132,13 +132,12 @@ three are data, no `Effects`: an implementation's bridge makes them its own hand
 under okay-core: handlers 40% faster). An interceptor (`local`, `handleWith`) is a `handle` whose clause performs
 the same operation outward (`e.perform(op)`): a clause runs outside its handler.
 
-**`Direct`, the fast path.** `Prog<A>` is the kernel's interface; an implementation's nodes do not know it, so its
-bridge wraps each and translates each bind — the cost of code written once. An implementation may implement
-`Direct` beside `Effects` — an interface of its own, not an `Effects` (code written once asks `e instanceof Direct`):
-the same operations on its own programs, untyped (`Any`), so code written once is built
-in its nodes directly, a bind's function passed as it is, wrapped only at the edges (a clause, another's program).
-Measured (the mixed program, µs for 1000 orders): okay-core's `zero` 279 → 248, `cont` 284 → 219, okay-java 224 →
-204. In the API from the first.
+**No wrapper: implementations implement the API.** okay-core and okay-java depend on `okay-kernel-api` (a jar of
+interfaces and a few records, no dependency of its own; on JS and Native its Scala mirror): their own nodes are
+`Prog`s, their own operations implement the vocabulary's families (`State.Ops`, … — open interfaces, each case's
+`fold` calling its own case; the TCK checks it). So code written once is built in an implementation's nodes as they
+are, and an operation crosses the border as it is. `Direct`, the fast path of the bridges' time, is gone. `Type` and
+`Same` stay concrete (an identity, a proof); `Step` stays data.
 
 Not written once, by design: the fronts (`A ! E1 + E2`, enums and matches, Java's capabilities), the machines, the
 platform (threads, timers: a hook), and programs where speed matters — they run on their implementation's own machine.
@@ -189,7 +188,7 @@ Scala 3, `lexical`, `Cont` in Java.
 
 `Effects` its name; control (`shift0`, `$`) its methods; `Aborting` a shape; failures and cancellation outcomes of a
 step; the runtime row `Computation.effects()`, checked at the border; an operation's value type `Op.value()`,
-checked in a debug mode; `Direct` in the API from the first, an interface of its own; `uncancelable` regions in
+checked in a debug mode; implementations depend on the API and implement it directly (no `Direct`); `uncancelable` regions in
 version 1.
 
 ## 9. The plan

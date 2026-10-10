@@ -9,7 +9,7 @@ object State {
   def narrow[S, X](op: Op[X]): Ops[S, X] =
     if (op.isInstanceOf[Ops[?, ?]]) op.asInstanceOf[Ops[S, X]]
     else throw new IllegalArgumentException("not an operation of State: " + op)
-  sealed trait Ops[S, X] extends Op[X] { def fold[R](c: Cases[S, X, R]): R }
+  trait Ops[S, X] extends Op[X] { def fold[R](c: Cases[S, X, R]): R }
   trait Cases[S, X, R] {
     def get(value: Same[S, X]): R
     def put(s: S, value: Same[Void, X]): R
@@ -30,7 +30,7 @@ object Reader {
   def narrow[E, X](op: Op[X]): Ops[E, X] =
     if (op.isInstanceOf[Ops[?, ?]]) op.asInstanceOf[Ops[E, X]]
     else throw new IllegalArgumentException("not an operation of Reader: " + op)
-  sealed trait Ops[E, X] extends Op[X] { def fold[R](c: Cases[E, X, R]): R }
+  trait Ops[E, X] extends Op[X] { def fold[R](c: Cases[E, X, R]): R }
   trait Cases[E, X, R] { def ask(value: Same[E, X]): R }
   final case class Ask[E](private val e: Type) extends Ops[E, E] {
     def effect(): Type = e
@@ -43,7 +43,7 @@ object Writer {
   def narrow[W, X](op: Op[X]): Ops[W, X] =
     if (op.isInstanceOf[Ops[?, ?]]) op.asInstanceOf[Ops[W, X]]
     else throw new IllegalArgumentException("not an operation of Writer: " + op)
-  sealed trait Ops[W, X] extends Op[X] { def fold[R](c: Cases[W, X, R]): R }
+  trait Ops[W, X] extends Op[X] { def fold[R](c: Cases[W, X, R]): R }
   trait Cases[W, X, R] { def tell(w: W, value: Same[Void, X]): R }
   final case class Tell[W](private val e: Type, private val v: W) extends Ops[W, Void] {
     def effect(): Type = e
@@ -57,7 +57,7 @@ object Throws {
   def narrow[E, X](op: Op[X]): Ops[E, X] =
     if (op.isInstanceOf[Ops[?, ?]]) op.asInstanceOf[Ops[E, X]]
     else throw new IllegalArgumentException("not an operation of Throws: " + op)
-  sealed trait Ops[E, X] extends Op[X] { def fold[R](c: Cases[E, X, R]): R }
+  trait Ops[E, X] extends Op[X] { def fold[R](c: Cases[E, X, R]): R }
   trait Cases[E, X, R] { def raise(error: E): R }
   final case class Raise[E, X](private val e: Type, private val err: E) extends Ops[E, X] {
     def effect(): Type = e
@@ -71,7 +71,7 @@ object Choose {
   def narrow[X](op: Op[X]): Ops[X] =
     if (op.isInstanceOf[Ops[?]]) op.asInstanceOf[Ops[X]]
     else throw new IllegalArgumentException("not an operation of Choose: " + op)
-  sealed trait Ops[X] extends Op[X] { def fold[R](c: Cases[X, R]): R }
+  trait Ops[X] extends Op[X] { def fold[R](c: Cases[X, R]): R }
   trait Cases[X, R] { def among(xs: java.util.List[X]): R }
   final case class Among[X](private val e: Type, private val v: java.util.List[X]) extends Ops[X] {
     def this(xs: java.util.List[X]) = this(TYPE, xs)
@@ -86,7 +86,7 @@ object Emit {
   def narrow[W, X](op: Op[X]): Ops[W, X] =
     if (op.isInstanceOf[Ops[?, ?]]) op.asInstanceOf[Ops[W, X]]
     else throw new IllegalArgumentException("not an operation of Emit: " + op)
-  sealed trait Ops[W, X] extends Op[X] { def fold[R](c: Cases[W, X, R]): R }
+  trait Ops[W, X] extends Op[X] { def fold[R](c: Cases[W, X, R]): R }
   trait Cases[W, X, R] { def send(w: W, value: Same[Void, X]): R }
   final case class Send[W](private val e: Type, private val v: W) extends Ops[W, Void] {
     def effect(): Type = e
@@ -103,7 +103,7 @@ object Async {
   def narrow[X](op: Op[X]): Ops[X] =
     if (op.isInstanceOf[Ops[?]]) op.asInstanceOf[Ops[X]]
     else throw new IllegalArgumentException("not an operation of Async: " + op)
-  sealed trait Ops[X] extends Op[X] { def fold[R](c: Cases[X, R]): R }
+  trait Ops[X] extends Op[X] { def fold[R](c: Cases[X, R]): R }
   trait Cases[X, R] {
     def await(register: Register[X]): R
     def fork[Y](body: Program[Y], value: Same[Fiber[Y], X]): R
@@ -141,7 +141,7 @@ object Control {
   def narrow[X](op: Op[X]): Ops[X] =
     if (op.isInstanceOf[Ops[?]]) op.asInstanceOf[Ops[X]]
     else throw new IllegalArgumentException("not an operation of Control: " + op)
-  sealed trait Ops[X] extends Op[X] { def fold[R](c: Cases[X, R]): R }
+  trait Ops[X] extends Op[X] { def fold[R](c: Cases[X, R]): R }
   trait Cases[X, R] { def capture(body: Fn[Fn[X, Program[Any]], Program[Any]]): R }
   final case class Capture[X](private val e: Type, private val b: Fn[Fn[X, Program[Any]], Program[Any]]) extends Ops[X] {
     def effect(): Type = e

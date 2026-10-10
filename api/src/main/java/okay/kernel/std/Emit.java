@@ -21,7 +21,9 @@ public final class Emit {
     throw new IllegalArgumentException("not an operation of Emit: " + op);
   }
 
-  public sealed interface Ops<W, X> extends Op<X> permits Send {
+  /** its operations: the kernel's records below, or an implementation's own — implementing it, its {@code fold}
+   * calling its own case (the TCK checks it) */
+  public interface Ops<W, X> extends Op<X> {
     <R> R fold(Cases<W, X, R> c);
   }
 

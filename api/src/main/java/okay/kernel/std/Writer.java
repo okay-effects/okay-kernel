@@ -21,7 +21,9 @@ public final class Writer {
     throw new IllegalArgumentException("not an operation of Writer: " + op);
   }
 
-  public sealed interface Ops<W, X> extends Op<X> permits Tell {
+  /** its operations: the kernel's records below, or an implementation's own — implementing it, its {@code fold}
+   * calling its own case (the TCK checks it) */
+  public interface Ops<W, X> extends Op<X> {
     <R> R fold(Cases<W, X, R> c);
   }
 

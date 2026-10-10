@@ -22,7 +22,9 @@ public final class State {
     throw new IllegalArgumentException("not an operation of State: " + op);
   }
 
-  public sealed interface Ops<S, X> extends Op<X> permits Get, Put {
+  /** its operations: the kernel's records below, or an implementation's own — implementing it, its {@code fold}
+   * calling its own case (the TCK checks it) */
+  public interface Ops<S, X> extends Op<X> {
     <R> R fold(Cases<S, X, R> c);
   }
 
