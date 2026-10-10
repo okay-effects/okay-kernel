@@ -2,7 +2,7 @@ package okay.lexical
 
 import okay.kernel.{Effect, Fn, Handler, Monad, Op, Program, Steps}
 import okay.kernel.Prog as KProg
-import okay.std.{Effects, Get, Handlers, Put, Raise, Tell}
+import okay.std.{Effects, Final, Get, Handlers, JavaHandlers, Logged, Put, Raise, Result, Tell}
 
 /**
  * THE KERNEL TYPED BY LEVELS, NOT ROWS: for Java and Scala 2, whose types have no rows. A program is at a level `L`;
@@ -39,32 +39,24 @@ object Prog:
 
   /** a log of `W`s: the log, first told first, and the value */
   def writer[L, W, A](body: WriterBody[L, W, A]): Prog[L, Logged[W, A]] =
-    Prog[L, (List[W], A)](m => {
+    Prog(m => {
       val e = Effect("Writer")
-      m.handle(Handlers.writer[W, A](e), body.in(WriterCap(e)))
-    }).map { case (log, a) => Logged(javaList(log), a) }
+      m.handle(JavaHandlers.writer[W, A](e), body.in(WriterCap(e)))
+    })
 
   /** a state of a cell, one a run: the final state and the value */
   def state[L, S, A](s0: S, body: StateBody[L, S, A]): Prog[L, Final[S, A]] =
-    Prog[L, (S, A)](m => {
+    Prog(m => {
       val e = Effect("State")
-      m.handle(Handlers.state[S, A](e, s0), body.in(StateCap(e)))
-    }).map { case (s, a) => Final(s, a) }
+      m.handle(JavaHandlers.state[S, A](e, s0), body.in(StateCap(e)))
+    })
 
   /** the value, or the first failure raised */
   def attempt[L, E, A](body: ThrowsBody[L, E, A]): Prog[L, Result[E, A]] =
-    Prog[L, Either[E, A]](m => {
+    Prog(m => {
       val e = Effect("Throws")
-      m.handle(Handlers.throws[E, A](e), body.in(ThrowsCap(e)))
-    }).map {
-      case Right(a) => Result.ok(a)
-      case Left(e) => Result.failed(e)
-    }
-
-  private def javaList[W](l: List[W]): java.util.List[W] =
-    val r = java.util.ArrayList[W]()
-    l.foreach(r.add)
-    r
+      m.handle(JavaHandlers.throws[E, A](e), body.in(ThrowsCap(e)))
+    })
 
   private final class WriterCap[M, W](e: Effect) extends Writer[M, W]:
     def tell(w: W): Prog[M, Unit] = Prog(m => m.perform(Tell(w, e)))
@@ -103,11 +95,3 @@ trait Throws[L, E]:
   def raise[X](e: E): Prog[L, X]
   def at[M <: L]: Throws[M, E] = this.asInstanceOf[Throws[M, E]]
 
-final case class Logged[W, A](log: java.util.List[W], value: A)
-final case class Final[S, A](state: S, value: A)
-sealed trait Result[E, A]
-object Result:
-  final case class Ok[E, A](value: A) extends Result[E, A]
-  final case class Failed[E, A](error: E) extends Result[E, A]
-  def ok[E, A](a: A): Result[E, A] = Ok(a)
-  def failed[E, A](e: E): Result[E, A] = Failed(e)

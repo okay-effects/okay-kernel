@@ -1,6 +1,7 @@
 package okay.kernel
 
 import okay.lexical.*
+import okay.std.{Final, Result}
 
 /** the kernel by levels: Java's programs, statically checked, each capability its own handler's — on every monad */
 abstract class TestLexical(m: Monad) extends munit.FunSuite:

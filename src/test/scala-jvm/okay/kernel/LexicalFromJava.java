@@ -2,6 +2,9 @@ package okay.kernel;
 
 import okay.lexical.*;
 import okay.lexical.Prog;
+import okay.std.Logged;
+import okay.std.Final;
+import okay.std.Result;
 
 /** THE KERNEL BY LEVELS, FROM JAVA: capabilities checked statically, each reaching its own handler */
 public final class LexicalFromJava {

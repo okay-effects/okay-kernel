@@ -18,6 +18,13 @@ public final class FromJava {
         u -> m.map(m.perform(new Await<Integer>(cb -> cb.ok(a * 10))), x -> (Integer) x + 1));
   }
 
+  /** Scala 3's `p(1)` under the handlers for Java: its log a `java.util.List`, typed */
+  public static okay.std.Logged<String, Object> scalasUnderJavaTypes(Monad m) {
+    Program<Object> p = Programs.p(1);
+    Program<Object> withAsync = mm -> mm.handle(Handlers.async(), p);
+    return Program.run(mm -> mm.handle(okay.std.JavaHandlers.<String, Object>writer(Effects.writer(String.class)), withAsync), m);
+  }
+
   /** Scala 3's `p(1)`, its handlers installed from Java, on the monad Java chose */
   public static Tuple2<List<String>, Object> scalasUnderJavas(Monad m) {
     Program<Object> p = Programs.p(1);
