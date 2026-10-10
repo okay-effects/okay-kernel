@@ -17,6 +17,9 @@ class TestSteps extends FunSuite {
   def prog[A](f: Effects => Prog[A]): Program[A] = new Program[A] { def in(e: Effects): Prog[A] = f(e) }
   def fn[A, B](f: A => B): Fn[A, B] = new Fn[A, B] { def apply(a: A): B = f(a) }
   def run[A](p: Program[A]): A = Steps.run(p)
+  def set(ts: Type*): java.util.Set[Type] = { val s = new java.util.HashSet[Type](); ts.foreach(s.add); s }
+  /** a row as Scala's set: java.util's equals of sets (containsAll) fails on Scala Native under Scala 3 */
+  def elems(s: java.util.Set[Type]): Set[Type] = { val b = Set.newBuilder[Type]; val i = s.iterator(); while (i.hasNext) b += i.next(); b.result() }
 
   def count(n: Int): Program[Integer] = prog { e =>
     if (n == 0) Handlers.get[Integer](st).in(e)
@@ -36,7 +39,7 @@ class TestSteps extends FunSuite {
     }
     val r = run(Handlers.reader[Integer, Results.Logged[String, Results.Final[Integer, Integer]]](rd, 7,
       Handlers.writer[String, Results.Final[Integer, Integer]](log, Handlers.state[Integer, Integer](st, 0, body))))
-    assertEquals(r.log(), java.util.List.of("n=7"))
+    assertEquals(r.log(), java.util.Arrays.asList("n=7"))
     assertEquals(r.value().state().intValue, 7)
   }
 
@@ -50,10 +53,10 @@ class TestSteps extends FunSuite {
 
   test("choose: every path; the first") {
     val pair = prog { e =>
-      e.flatMap(Handlers.among[Integer](java.util.List.of(1, 2)).in(e), fn((a: Integer) =>
-        e.map(Handlers.among[Integer](java.util.List.of(10, 20)).in(e), fn((b: Integer) => Integer.valueOf(a * 100 + b)))))
+      e.flatMap(Handlers.among[Integer](java.util.Arrays.asList(1, 2)).in(e), fn((a: Integer) =>
+        e.map(Handlers.among[Integer](java.util.Arrays.asList(10, 20)).in(e), fn((b: Integer) => Integer.valueOf(a * 100 + b)))))
     }
-    assertEquals(run(Handlers.all(pair)), java.util.List.of[Integer](110, 120, 210, 220))
+    assertEquals(run(Handlers.all(pair)), java.util.Arrays.asList[Integer](110, 120, 210, 220))
     assertEquals(run(Handlers.first(pair)).get().intValue, 110)
   }
 
@@ -77,7 +80,7 @@ class TestSteps extends FunSuite {
   }
 
   test("a failure is data; recover catches it; an exception of a function is one") {
-    val c = Steps.computation(prog(e => e.map(e.pure(Integer.valueOf(1)), fn((_: Integer) => (throw new IllegalStateException("x")): Integer))), java.util.Set.of[Type]())
+    val c = Steps.computation(prog(e => e.map(e.pure(Integer.valueOf(1)), fn((_: Integer) => (throw new IllegalStateException("x")): Integer))), set())
     assert(c.start(Answers.NONE).isInstanceOf[Step.Failed[?]])
     assertEquals(run(prog(e => e.recover[Integer](prog(_.failed(new RuntimeException("no"))), fn((t: Throwable) => e.pure(Integer.valueOf(t.getMessage.length)))))).intValue, 2)
   }
@@ -86,13 +89,13 @@ class TestSteps extends FunSuite {
   val ask: Program[Integer] = Handlers.ask[Integer](rd)
 
   test("export: an operation handed out, k resumed — twice, multi-shot") {
-    val c = Steps.computation(prog(e => e.map(ask.in(e), fn((n: Integer) => Integer.valueOf(n + 1)))), java.util.Set.of(rd))
+    val c = Steps.computation(prog(e => e.map(ask.in(e), fn((n: Integer) => Integer.valueOf(n + 1)))), set(rd))
     c.start(Answers.NONE) match {
       case y: Step.Yield[?, ?] =>
         val k = y.k().asInstanceOf[Resume[Integer, Integer]]
         assertEquals(k.resume(41).asInstanceOf[Step.Done[Integer]].value().intValue, 42)
         assertEquals(k.resume(1).asInstanceOf[Step.Done[Integer]].value().intValue, 2)
-        assertEquals(c.effects(), java.util.Set.of(rd))
+        assertEquals(elems(c.effects()), Set(rd))
       case s => fail(s"expected a yield: $s")
     }
   }
@@ -102,12 +105,12 @@ class TestSteps extends FunSuite {
       def answers(t: Type): Boolean = t eq rd
       def value[X](op: Op[X]): X = Integer.valueOf(41).asInstanceOf[X]
     }
-    val c = Steps.computation(prog(e => e.map(ask.in(e), fn((n: Integer) => Integer.valueOf(n + 1)))), java.util.Set.of(rd))
+    val c = Steps.computation(prog(e => e.map(ask.in(e), fn((n: Integer) => Integer.valueOf(n + 1)))), set(rd))
     assertEquals(c.start(host).asInstanceOf[Step.Done[Integer]].value().intValue, 42)
   }
 
   test("k.fail: the computation catches it where the operation was") {
-    val c = Steps.computation(prog(e => e.recover[Integer](ask, fn((t: Throwable) => e.pure(Integer.valueOf(-1))))), java.util.Set.of(rd))
+    val c = Steps.computation(prog(e => e.recover[Integer](ask, fn((t: Throwable) => e.pure(Integer.valueOf(-1))))), set(rd))
     val y = c.start(Answers.NONE).asInstanceOf[Step.Yield[Integer, Integer]]
     assertEquals(y.k().fail(new RuntimeException("x")).asInstanceOf[Step.Done[Integer]].value().intValue, -1)
   }
@@ -115,10 +118,10 @@ class TestSteps extends FunSuite {
   test("k.cancel: finalizers run, not catchable; inside uncancelable it waits") {
     var finalized = 0
     val fin = prog { e => finalized += 1; e.pure(null: Void) }
-    val c = Steps.computation(prog(e => e.recover[Integer](prog(e2 => e2.ensuring(ask, fin)), fn((_: Throwable) => e.pure(Integer.valueOf(0))))), java.util.Set.of(rd))
+    val c = Steps.computation(prog(e => e.recover[Integer](prog(e2 => e2.ensuring(ask, fin)), fn((_: Throwable) => e.pure(Integer.valueOf(0))))), set(rd))
     val y = c.start(Answers.NONE).asInstanceOf[Step.Yield[Integer, Integer]]
     assert(y.k().cancel().isInstanceOf[Step.Cancelled[?]] && finalized == 1, "cancelled, finalizer once, recover not taken")
-    val u = Steps.computation(prog(e => e.uncancelable(ask)), java.util.Set.of(rd))
+    val u = Steps.computation(prog(e => e.uncancelable(ask)), set(rd))
     val wait = u.start(Answers.NONE).asInstanceOf[Step.Yield[Integer, Integer]].k().cancel()
     assert(wait.isInstanceOf[Step.Yield[?, ?]], "the region waits")
     assert(wait.asInstanceOf[Step.Yield[Integer, Integer]].k().resume(5).isInstanceOf[Step.Cancelled[?]], "its end cancels")
@@ -126,9 +129,9 @@ class TestSteps extends FunSuite {
 
   test("import: another's program under this one's handlers — in place and by k") {
     val inner = Steps.computation(prog { e =>
-      e.flatMap(ask.in(e), fn((n: Integer) => e.map(Handlers.among[Integer](java.util.List.of(n, n + 1)).in(e), fn((x: Integer) => Integer.valueOf(x * 10)))))
-    }, java.util.Set.of(rd, okay.kernel.std.Choose.TYPE))
+      e.flatMap(ask.in(e), fn((n: Integer) => e.map(Handlers.among[Integer](java.util.Arrays.asList(n, n + 1)).in(e), fn((x: Integer) => Integer.valueOf(x * 10)))))
+    }, set(rd, okay.kernel.std.Choose.TYPE))
     val outer = Handlers.reader[Integer, java.util.List[Integer]](rd, 4, Handlers.all(prog(e => e.foreign(inner))))
-    assertEquals(run(outer), java.util.List.of[Integer](40, 50))
+    assertEquals(run(outer), java.util.Arrays.asList[Integer](40, 50))
   }
 }

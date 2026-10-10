@@ -52,15 +52,15 @@ trait Thunk[A] { def get(): A }
 
 sealed trait Same[A, B] { def apply(a: A): B }
 object Same {
-  final class Refl[A]() extends Same[A, A] { def apply(a: A): A = a }
+  final case class Refl[A]() extends Same[A, A] { def apply(a: A): A = a }
 }
 
 sealed trait Step[A]
 object Step {
-  final class Done[A](v: A) extends Step[A] { def value(): A = v }
-  final class Yield[X, A](o: Op[X], r: Resume[X, A]) extends Step[A] { def op(): Op[X] = o; def k(): Resume[X, A] = r }
-  final class Failed[A](e: Throwable) extends Step[A] { def error(): Throwable = e }
-  final class Cancelled[A]() extends Step[A]
+  final case class Done[A](private val v: A) extends Step[A] { def value(): A = v }
+  final case class Yield[X, A](private val o: Op[X], private val r: Resume[X, A]) extends Step[A] { def op(): Op[X] = o; def k(): Resume[X, A] = r }
+  final case class Failed[A](private val e: Throwable) extends Step[A] { def error(): Throwable = e }
+  final case class Cancelled[A]() extends Step[A]
 }
 
 trait Resume[X, A] {

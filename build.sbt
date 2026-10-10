@@ -150,8 +150,6 @@ lazy val steps = crossProject(JVMPlatform, JSPlatform, NativePlatform)
     crossScalaVersions := Seq("3.9.0", "2.13.18"),
     scalacOptions ++= (if (scalaVersion.value.startsWith("2.")) Seq("-deprecation", "-Xsource:3") else Seq("-deprecation")),
     libraryDependencies += "org.scalameta" %%% "munit" % "1.2.3" % Test)
-  // the standard handlers are the API's Java on the JVM: the tests using them, the JVM's
-  .jvmSettings(Test / unmanagedSourceDirectories += baseDirectory.value.getParentFile / "src" / "test" / "scala-jvm")
 
 /** THE REFERENCE MACHINE IN JAVA: the same as `steps`, pure Java on the API alone — `dev.okay:okay-kernel-steps-java` */
 lazy val stepsJava = (project in file("steps-java"))
