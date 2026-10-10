@@ -90,16 +90,16 @@ abstract class TestKernel(m: Monad, big: Int) extends munit.FunSuite:
   // CONT0: THE ANSWER TYPE MODIFIED, STATICALLY
 
   test("cont0: reset0(1 + shift0(k => k(k(10)))) is 12; the answer type Int to String") {
-    val p = okay.Cont0.reset0[Int, Int, Int, Int, Int](
-      okay.Cont0.shift0[Int, Int, Int, okay.Cont0[Int, Int, Int], Int](k => k(10).flatMap(k)).map(_ + 1))
-    assertEquals(okay.Cont0.value(p, m), 12)
-    val q = okay.Cont0.reset0[String, String, String, String, String](
-      okay.Cont0.shift0[String, String, String, okay.Cont0[String, String, String], Int](k => k(5)).map(_ * 2).map(_.toString))
-    assertEquals(okay.Cont0.value(q, m), "10")
+    val p = okay.Cont.reset0[Int, Int, Int, Int, Int](
+      okay.Cont.shift0[Int, Int, Int, okay.Cont[Int, Int, Int], Int](k => k(10).flatMap(k)).map(_ + 1))
+    assertEquals(okay.Cont.value(p, m), 12)
+    val q = okay.Cont.reset0[String, String, String, String, String](
+      okay.Cont.shift0[String, String, String, okay.Cont[String, String, String], Int](k => k(5)).map(_ * 2).map(_.toString))
+    assertEquals(okay.Cont.value(q, m), "10")
   }
 
   test("cont0: printf, the answer modified once a hole") {
-    import okay.Cont0 as C
+    import okay.Cont as C
     def d[S, T]: C[C[T, T, T], C[S, S, Int => T], String] =
       C.shift0[T, T, T, C[S, S, Int => T], String](k => C.pure[S, Int => T](x => C.value(k(x.toString), m)))
     def s[S, T]: C[C[T, T, T], C[S, S, String => T], String] =

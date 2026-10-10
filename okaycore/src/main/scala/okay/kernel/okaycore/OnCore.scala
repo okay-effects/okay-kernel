@@ -7,7 +7,7 @@ import okay.kernel.{Answering, Effect, Fn, Handler, Monad, Op, Prog, Program, Th
 final case class Dyn[X](op: Op[X])
 
 /**
- * A MONAD OF THE KERNEL ON OKAY-CORE: its programs okay-core's, `c.Prog`, run by its machines — `zero`'s (Cont0, the
+ * A MONAD OF THE KERNEL ON OKAY-CORE: its programs okay-core's, `c.Prog`, run by its machines — `zero`'s (Cont, the
  * hybrid) or `cont`'s. The kernel's handlers are okay-core's of the effect `Dyn`; the context remembers the kernel's
  * effects of its row, innermost first, so an operation finds its path, `In`, to the nearest handler of its effect.
  * A handler's answer is the program outside it, flattened when the handler is left: so `k` is the rest with the
@@ -61,7 +61,7 @@ final class OnCore private (val c: Effects, effs: List[Effect], top: CoreTop) ex
   def run[A](p: Prog[A]): A = top.run[Any](prog(p).asInstanceOf[top.M[Any, Any, Any, Any]]).asInstanceOf[A]
 
 object OnCore:
-  /** okay-core's Cont0, its hybrid machine */
+  /** okay-core's Cont, its hybrid machine */
   val zero: Monad = OnCore(okay.zero.top.at[Any], Nil, okay.zero.top)
   /** okay-core's Cont, its loop */
   val cont: Monad = OnCore(okay.cont.top.at[Any], Nil, okay.cont.top)

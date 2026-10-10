@@ -42,12 +42,16 @@ class TestLexicalLeaks extends munit.FunSuite:
 
 /** the answer type, moved by a shift, checked by Java's compiler */
 class TestContTypes extends munit.FunSuite:
-  val moving = """okay.Cont<Integer, String, Integer> b = okay.Cont.<Integer, String, Integer>shift(k -> okay.Cont.pure("x"));
+  // Scala's Cont.Flat[I, O, A], in Java its whole type: Cont<Cont<I, I, I>, Cont<O, O, O>, A>
+  val moving = """okay.Cont<okay.Cont<Integer, Integer, Integer>, okay.Cont<String, String, String>, Integer> b =
+    |  okay.Cont.<Integer, String, Integer>shift(k -> okay.Cont.pure("x"));
     |%s""".stripMargin
   test("the reset's answer what the shift moved it to, a String: compiles") {
-    assertEquals(Javac.errors(moving.format("okay.Cont<Object, Object, String> r = okay.Cont.reset(b); return r;")), Nil)
+    assertEquals(Javac.errors(moving.format(
+      "okay.Cont<okay.Cont<Object, Object, Object>, okay.Cont<Object, Object, Object>, String> r = okay.Cont.reset(b); return r;")), Nil)
   }
   test("taken as an Integer, the answer before the move: does not compile") {
-    val e = Javac.errors(moving.format("okay.Cont<Object, Object, Integer> r = okay.Cont.reset(b); return r;"))
+    val e = Javac.errors(moving.format(
+      "okay.Cont<okay.Cont<Object, Object, Object>, okay.Cont<Object, Object, Object>, Integer> r = okay.Cont.reset(b); return r;"))
     assert(e.nonEmpty, "compiled")
   }
