@@ -77,13 +77,18 @@ class TestAgree extends munit.FunSuite:
     val r = Random(20261010)
     var differ = List.empty[String]
     var values = 0
+    var digest = 0L
     for i <- 1 to 1000 do
       // a handler of each kind around, so most programs come to a value
       val p = T.Choose(T.Throws(0, T.Throws(1, T.State(0, 0, T.State(1, 0, T.Writer(0, T.Writer(1, gen(r, 6))))))))
       val outs = monads.map((n, m) => n -> outcome(p, m))
       if outs.head._2.isRight then values += 1
+      digest = digest * 31 + outs.head._2.getOrElse(-1_000_000)
       if outs.map(_._2).distinct.size > 1 then differ = s"#$i $p: ${outs.mkString(", ")}" :: differ
     assert(differ.isEmpty, differ.take(3).mkString("\n"))
     // every handler in force, but a raise's own: most come to a value
     assert(values > 900, s"$values of 1000 came to a value")
+    // okay-java's AgreeTest: the same programs (java.util.Random, the same seed), the same outcomes — two
+    // implementations of the kernel, one behaviour
+    assertEquals(digest, -8623788747993822161L)
   }
