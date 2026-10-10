@@ -73,9 +73,9 @@ class TestAgree extends munit.FunSuite:
     try Right(Program.run[Int](mm => build(p, mm), m))
     catch case e: IllegalStateException => Left("no handler")
 
-  // okay-java's machine among them: its jar, binary, on the same API
+  // the kernel's machine in Java among them (java/): its jar, binary, on the same API
   val monads = List("Steps" -> Steps, "Ref" -> Ref, "zero" -> OnCore.zero, "cont" -> OnCore.cont,
-    "java" -> okay.java.kernel.Monads.steps())
+    "java" -> okay.jkernel.Monads.steps())
 
   test("a thousand programs at random: every monad agrees") {
     val r = Random(20261010)
@@ -92,7 +92,7 @@ class TestAgree extends munit.FunSuite:
     assert(differ.isEmpty, differ.take(3).mkString("\n"))
     // every handler in force, but a raise's own: most come to a value
     assert(values > 900, s"$values of 1000 came to a value")
-    // okay-java's AgreeTest: the same programs (java.util.Random, the same seed), the same outcomes — two
+    // the Java module's AgreeTest: the same programs (java.util.Random, the same seed), the same outcomes — two
     // implementations of the kernel, one behaviour
     assertEquals(digest, -8623788747993822161L)
   }

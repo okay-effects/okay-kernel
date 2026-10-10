@@ -4,13 +4,13 @@ import java.util.concurrent.{CompletableFuture, TimeUnit}
 import okay.{!, %, +, Eff}
 import okay.std.*
 import okay.kernel.std.{Await, Effects, Logged, Tell}
-import okay.java.kernel.{Monads as JavaMonads}
-import okay.java.kernel.demo.{Programs as JavaPrograms}
-import okay.java.kernel.std.{Async as JavaAsync, Handlers as JavaHandlers}
+import okay.jkernel.{Monads as JavaMonads}
+import okay.jkernel.demo.{Programs as JavaPrograms}
+import okay.jkernel.std.{Async as JavaAsync, Handlers as JavaHandlers}
 import okay.demo.Programs
 
 /**
- * BINARY COMPATIBILITY: okay-java's jar — compiled by javac, in another build, against the same `okay-kernel-api` —
+ * BINARY COMPATIBILITY: the Java module's jar (`java/`) — compiled by javac against the same `okay-kernel-api` —
  * with this one's, in one run. Programs of each on the machines of the other, under the handlers of the other, both
  * nested in one: one class an interface, an operation, an answer, so nothing between them is translated
  */

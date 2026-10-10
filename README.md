@@ -37,15 +37,20 @@ its clauses on `R ! Rest`, its `handle` taking `E` off a program's row and putti
 
 On the JVM the API is pure Java with no dependency: the interfaces above, `Effect`, and the standard effects' data
 (`okay.kernel.std`) — `Effects`, the operations `Tell`, `Raise`, `Get`, `Put`, `Among`, `Await`, `Shift0`, `Shift`,
-`Callback`, and the handlers' Java answers `Logged`, `Result`, `Final`. This kernel's Scala and okay-java's Java are
+`Callback`, and the handlers' Java answers `Logged`, `Result`, `Final`. The kernel's Scala and its Java (`java/`) are
 compiled against that one jar. One class for an interface, an operation, an answer: a program, a handler, a monad of
 one works with those of the other, nothing translated. Their implementations have packages of their own (`okay.*`
-here, `okay.java.kernel.*` there), so both jars share one classpath. An operation of value `Void` is answered
+in Scala, `okay.jkernel.*` in Java), so both jars share one classpath. An operation of value `Void` is answered
 `null`: Java's continuations cast to `Void`. On Scala.js and Scala Native, with no Java, the API is its Scala mirror
 (`src/main/scala-mirror`): the same signatures, invariant as Java's.
 
-Built in order, through `~/.m2`: `sbt api/publishM2` (okay-java compiles against it), then okay-java's
-`./gradlew publishToMavenLocal` (this kernel's JVM tests run its machine and handlers: `TestBinary`, `TestAgree`).
+## The ecosystem: the kernel over two libraries
+
+okay-core (Scala 3) and okay-java (Java) are libraries of their own, of no dependency: neither knows the kernel. The
+kernel is the layer over them — the API every language and platform shares, its machines, and an adapter a library:
+`OnCore` (`okaycore/`) runs the kernel's programs on okay-core's machines. The kernel's own Java — a machine of the
+API and the standard handlers in Java — is the module `java/` (`dev.okay:okay-kernel-java`, `okay.jkernel`), built
+here; okay-java stays a library.
 
 ## The monads
 
@@ -53,7 +58,8 @@ Built in order, through `~/.m2`: `sbt api/publishM2` (okay-java compiles against
   the heap allows, one step a kind of node.
 - `Ref` (tests): the textbook, recursive — what every monad must agree with.
 - `OnCore.zero`, `OnCore.cont` (`okaycore/`): okay-core's machines through its `Effects`.
-- okay-java's `okay.java.kernel.Steps`: its jar, binary — the same random programs, the same outcomes (`TestAgree`).
+- `okay.jkernel.Steps` (`java/`): the machine in Java, compiled by javac against the API's jar — the same random
+  programs, the same outcomes (`TestAgree`, and `AgreeTest` in Java).
 
 ## Scala 3's typed view (`okay`, `okay.std`)
 
@@ -65,5 +71,5 @@ by `Eff.from`, their effects as said, checked at run time.
 ## Tests
 
 `sbt test`: the same suite on every monad, on the JVM, Scala.js and Scala Native; Java's programs and Scala 3's in
-one, both ways (`src/test/scala-jvm`); okay-java's jar with this one's, in one run (`TestBinary`); Scala 2's
-(`scala2/`).
+one, both ways (`src/test/scala-jvm`); the Java module's jar with the Scala one, in one run (`TestBinary`); the Java
+module's own, JUnit (`java/`); Scala 2's (`scala2/`).
