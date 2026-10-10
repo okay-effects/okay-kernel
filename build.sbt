@@ -179,6 +179,18 @@ lazy val tck = (project in file("tck"))
     libraryDependencies += "org.scalameta" %% "munit" % "1.2.3",
     Test / fork := true)
 
+/**
+ * EVERY IMPLEMENTATION IN ONE PROCESS: the TCK on each implementation's bridge, published locally from its own
+ * repository (okay-java: `./gradlew publishToMavenLocal`; okay-core: `sbt kernel/publishM2`), nesting through the
+ * others. Tests only, not published
+ */
+lazy val integration = (project in file("integration"))
+  .dependsOn(tck, steps.jvm, stepsJava)
+  .settings(
+    libraryDependencies += "dev.okay" % "okay-java-kernel" % "0.1.0-SNAPSHOT" % Test,
+    Test / fork := true,
+    publish / skip := true)
+
 lazy val root = (project in file("."))
   .aggregate(api, scalaApi.jvm, scalaApi.js, scalaApi.native, steps.jvm, steps.js, steps.native, stepsJava, tck, legacy)
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
