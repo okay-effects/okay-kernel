@@ -73,7 +73,7 @@ trait Handler:
 /** a TAIL-RESUMPTIVE handler: each clause is `k(value(op))` — answered in place, no capture */
 trait Answering extends Handler:
   def value(op: Op[?]): Any
-  final def apply(op: Op[?], k: Fn[Any, Any], m: Monad): Any = k(value(op))
+  def apply(op: Op[?], k: Fn[Any, Any], m: Monad): Any = k(value(op))
 
 /** A MONAD: an implementation of the kernel — programs of its own (`Any`), and their run */
 trait Monad:
