@@ -90,7 +90,16 @@ lazy val okaycore = (project in file("okaycore"))
     Test / fork := true,
     publish / skip := true)
 
+/** THE KERNEL'S MONAD ON OKAY-JAVA: its machine of prompts, the kernel's suites on it (okay-java published locally:
+ * `./gradlew publishToMavenLocal` in okay-java) */
+lazy val okayjava = (project in file("okayjava"))
+  .dependsOn(core.jvm % "compile->compile;test->test", kernelJava % Test)
+  .settings(
+    libraryDependencies ++= Seq("dev.okay" % "okay-java" % "0.1.0-SNAPSHOT", "org.scalameta" %% "munit" % "1.2.3" % Test),
+    Test / fork := true,
+    publish / skip := true)
+
 lazy val root = (project in file("."))
-  .aggregate(api, kernelJava, core.jvm, core.js, core.native, scala2, okaycore)
+  .aggregate(api, kernelJava, core.jvm, core.js, core.native, scala2, okaycore, okayjava)
   // the aggregate only: the sources are the cross-project's
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)

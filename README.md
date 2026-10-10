@@ -48,7 +48,7 @@ in Scala, `okay.jkernel.*` in Java), so both jars share one classpath. An operat
 
 okay-core (Scala 3) and okay-java (Java) are libraries of their own, of no dependency: neither knows the kernel. The
 kernel is the layer over them — the API every language and platform shares, its machines, and an adapter a library:
-`OnCore` (`okaycore/`) runs the kernel's programs on okay-core's machines. The kernel's own Java — a machine of the
+`OnCore` (`okaycore/`) runs the kernel's programs on okay-core's machines, `OnJava` (`okayjava/`) on okay-java's. The kernel's own Java — a machine of the
 API and the standard handlers in Java — is the module `java/` (`dev.okay:okay-kernel-java`, `okay.jkernel`), built
 here; okay-java stays a library.
 
@@ -58,6 +58,8 @@ here; okay-java stays a library.
   the heap allows, one step a kind of node.
 - `Ref` (tests): the textbook, recursive — what every monad must agree with.
 - `OnCore.zero`, `OnCore.cont` (`okaycore/`): okay-core's machines through its `Effects`.
+- `OnJava.monad` (`okayjava/`): okay-java's machine of prompts — a handler an `Eff.handle`, an operation `shift0` to
+  the prompt of the nearest handler of its effect, an answering one's `Eff.sync`, no capture.
 - `okay.jkernel.Steps` (`java/`): the machine in Java, compiled by javac against the API's jar — the same random
   programs, the same outcomes (`TestAgree`, and `AgreeTest` in Java).
 
