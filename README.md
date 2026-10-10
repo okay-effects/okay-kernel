@@ -59,10 +59,28 @@ here; okay-java stays a library.
   the heap allows, one step a kind of node.
 - `Ref` (tests): the textbook, recursive — what every monad must agree with.
 - `OnCore.zero`, `OnCore.cont` (`okaycore/`): okay-core's machines through its `Effects`.
+- Both adapters are `Direct` (`okay.kernel.Direct`, optional, Scala's): Scala 3's typed programs built in the
+  library's own nodes, no kernel `Prog` around each node; Java's programs and the handlers by `Monad`. The standard
+  handlers are `Returning`: okay-core's own handler under `OnCore`, nothing flattened.
 - `OnJava.monad` (`okayjava/`): okay-java's machine of prompts — a handler an `Eff.handle`, an operation `shift0` to
   the prompt of the nearest handler of its effect, an answering one's `Eff.sync`, no capture.
 - `okay.jkernel.Steps` (`java/`): the machine in Java, compiled by javac against the API's jar — the same random
   programs, the same outcomes (`TestAgree`, and `AgreeTest` in Java).
+
+## What an adapter costs
+
+okay-java's mixed program (1000 orders: a reader's base, the first of three suppliers, a failure caught per order, a
+state, a log), written once on the typed view, JDK 26, JMH `-f 2 -wi 5 -i 5`, µs:
+
+| | adapter alone | + `Returning` | + `Direct` |
+|---|---|---|---|
+| `Steps`, the kernel's machine | 168 | | 170 |
+| `OnCore.zero` | 324 | 279 | 248 |
+| `OnCore.cont` | 292 | | 219 |
+| `OnJava` | 228 | | 204 |
+
+The same program in okay-core itself, its own std: 125 on `Cont0`, 142 on `Cont`. The rest of the distance is the
+kernel's handlers (clauses over `Monad`, `k` a kernel `Prog`) and a program's functions crossing the API.
 
 ## Scala 3's typed view (`okay`, `okay.std`)
 
