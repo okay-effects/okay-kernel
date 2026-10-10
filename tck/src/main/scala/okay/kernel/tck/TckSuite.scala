@@ -165,6 +165,71 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
     assertEquals((r.log(), r.value().isInstanceOf[Results.Err[?, ?]]), (list("fin"), true))
   }
 
+  // -- effects from effects: one's own effect translated to another, hidden inside, intercepted
+
+  private val auditT = Type.of("okay.kernel.tck.audit")
+  private val ticketT = Type.of("okay.kernel.tck.ticket")
+  /** one's own effect, its cases as a visitor: a translation total and typed, as a handler in Java or Scala 2 writes it */
+  private sealed trait AuditOps[X] extends Op[X] { def fold[R](c: AuditCases[X, R]): R }
+  private trait AuditCases[X, R] { def note(s: String, v: Same[Void, X]): R }
+  private final case class Note(s: String) extends AuditOps[Void] {
+    def effect(): Type = auditT
+    def fold[R](c: AuditCases[Void, R]): R = c.note(s, new Same.Refl[Void]())
+  }
+  private final case class Next() extends Op[Integer] { def effect(): Type = ticketT }
+  // an operation of the effect found by its identity, as one of its family: the test's one trusted step, as the
+  // vocabulary's `narrow`
+  private def audit[X](op: Op[X]): AuditOps[X] = op match { case a: AuditOps[X @unchecked] => a }
+  private def note(s: String): Program[Void] = prog(_.perform(Note(s)))
+
+  private val toWriter = new Handlers.Translation {
+    def apply[X](op: Op[X]): Program[X] = audit(op).fold(new AuditCases[X, Program[X]] {
+      def note(s: String, v: Same[Void, X]): Program[X] = prog(x => x.map(Handlers.tell[String](log, "[audit] " + s).in(x), fn((u: Void) => v(u))))
+    })
+  }
+
+  test(s"$name: one's effect translated to another outside it — no k written") {
+    val audited = prog(x => x.flatMap(note("a").in(x), fn((_: Void) => x.map(note("b").in(x), fn((_: Void) => int(7))))))
+    val r = run(e, Handlers.writer[String, Integer](log, Handlers.translate[Integer](auditT, toWriter, audited)))
+    assertEquals((r.log(), r.value().intValue), (list("[audit] a", "[audit] b"), 7))
+    // multi-shot through it: every path of a choice, each its own audit
+    val paths = prog(x => x.flatMap(Handlers.among[Integer](list(int(1), int(2))).in(x), fn((n: Integer) => x.map(note(s"$n").in(x), fn((_: Void) => n)))))
+    val all = run(e, Handlers.writer[String, java.util.List[Integer]](log, Handlers.all(Handlers.translate[Integer](auditT, toWriter, paths))))
+    assertEquals((all.value(), all.log().size), (list(int(1), int(2)), 2))
+  }
+
+  test(s"$name: one's effect on another installed inside, hidden — a fresh identity; the caller's own untouched") {
+    val hidden = Type.fresh()
+    def tickets[A](body: Program[A]): Program[Results.Final[Integer, A]] =
+      Handlers.state[Integer, A](hidden, int(0), Handlers.translate[A](ticketT, new Handlers.Translation {
+        def apply[X](op: Op[X]): Program[X] = op match {
+          case _: Next => prog(x => x.flatMap(Handlers.modify[Integer](hidden, fn((i: Integer) => int(i + 1))).in(x),
+            fn((_: Void) => Handlers.get[X](hidden).in(x))))
+        }
+      }, body))
+    val two = prog(x => x.flatMap(x.perform(Next()), fn((a: Integer) => x.flatMap(x.perform(Next()), fn((b: Integer) =>
+      x.map(Handlers.get[Integer](st).in(x), fn((s: Integer) => int(a * 10 + b + s * 100))))))))
+    val r = run(e, Handlers.state[Integer, Results.Final[Integer, Integer]](st, int(5), tickets(two)))
+    assertEquals((r.state().intValue, r.value().state().intValue, r.value().value().intValue), (5, 2, 512))
+  }
+
+  test(s"$name: interceptors — what an effect does in a body changed, nested, the clause's own operations outward") {
+    def times(n: Int) = new Handlers.Translation {
+      def apply[X](op: Op[X]): Program[X] = Reader.narrow[Integer, X](op).fold(new Reader.Cases[Integer, X, Program[X]] {
+        def ask(v: Same[Integer, X]): Program[X] = prog(x => x.map(Handlers.ask[Integer](rd).in(x), fn((r: Integer) => v(int(r * n)))))
+      })
+    }
+    def plus(n: Int) = new Handlers.Translation {
+      def apply[X](op: Op[X]): Program[X] = Reader.narrow[Integer, X](op).fold(new Reader.Cases[Integer, X, Program[X]] {
+        def ask(v: Same[Integer, X]): Program[X] = prog(x => x.map(Handlers.ask[Integer](rd).in(x), fn((r: Integer) => v(int(r + n)))))
+      })
+    }
+    assertEquals(run(e, Handlers.reader[Integer, Integer](rd, int(5), Handlers.intercept[Integer](rd, times(2), ask))).intValue, 10)
+    // the inner interceptor's ask goes to the outer one, its ask to the reader: (5 * 2) + 1
+    assertEquals(run(e, Handlers.reader[Integer, Integer](rd, int(5), Handlers.intercept[Integer](rd, times(2),
+      Handlers.intercept[Integer](rd, plus(1), ask)))).intValue, 11)
+  }
+
   test(s"$name: a thousand random programs, the reference's digest") {
     val os = outcomes(e)
     assert(os.count(_.isRight) > 700, s"${os.count(_.isRight)} of 1000 came to a value")

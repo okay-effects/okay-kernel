@@ -17,6 +17,7 @@ import okay.kernel.Prog;
 import okay.kernel.Program;
 import okay.kernel.Resume;
 import okay.kernel.Returning;
+import okay.kernel.Translating;
 import okay.kernel.Step;
 import okay.kernel.Thunk;
 import okay.kernel.Type;
@@ -101,7 +102,7 @@ public final class StepsJava implements Effects {
 
   // -- the frames: the rest of the run, innermost first
 
-  private sealed interface Frame permits FBind, FHandler, FDollar, FRecover, FEnsuring, FUncancelable, FRestore, FForeign, FAfter {}
+  private sealed interface Frame permits FBind, FHandler, FDollar, FRecover, FEnsuring, FUncancelable, FRestore, FForeign, FAfter, FResumeWith {}
   private record FBind(Fn<Object, Prog<Object>> f) implements Frame {}
   /** compared by identity: an abort unwinds to this very frame */
   private static final class FHandler implements Frame {
@@ -118,6 +119,9 @@ public final class StepsJava implements Effects {
   private record FForeign(Resume<Object, Object> k) implements Frame {}
   /** a foreign program being cancelled, its finalizers' steps answered here: when it ends, {@code outcome} goes on */
   private record FAfter(Outcome outcome) implements Frame {}
+  /** a translating handler's program running outside it: its value given to the body, {@code frames} back in front —
+   * no {@code k} made; a failure or a cancellation passes it as a clause's does */
+  private record FResumeWith(Frames frames) implements Frame {}
 
   /** the frames, an immutable singly linked list; {@code null} the empty one */
   private record Frames(Frame head, Frames tail) {}
@@ -300,6 +304,10 @@ public final class StepsJava implements Effects {
             }
             case FRestore fr -> out = fr.outcome();
             case FAfter fa -> out = fa.outcome();
+            case FResumeWith rw -> {
+              stack = prependAll(rw.frames(), stack);
+              out = r;
+            }
             case FForeign f -> {
               ForeignNext fs = foreignStep(f.k().resume(r.v()), stack);
               stack = fs.stack();
@@ -391,6 +399,10 @@ public final class StepsJava implements Effects {
     FHandler to = frame;
     if (to.h instanceof Answering<Object, Object> a) return new Performed(stack, inPlace(() -> new Ret(a.value(op))));
     if (to.h instanceof Aborting<Object, Object> a) return new Performed(stack, inPlace(() -> new Thrown(new Abort(to, a.abort(op)))));
+    if (to.h instanceof Translating<Object, Object> t) {
+      // the program outside the handler, the rest of the body then resumed with its value: no capture of k
+      return new Performed(push(new FResumeWith(take(stack, i + 1)), drop(stack, i + 1)), guarded(() -> build(t.translate(op))));
+    }
     if (to.h instanceof General<Object, Object> g) {
       Frames captured = take(stack, i + 1);
       Fn<Object, Prog<Object>> k = x -> new ResumeN<>(captured, x);

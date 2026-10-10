@@ -1,6 +1,6 @@
 package okay.kernel.std
 
-import okay.kernel.{Aborting, Answering, Effects, Fn, General, Op, Prog, Program, Returning, Same, Type}
+import okay.kernel.{Translating, Aborting, Answering, Effects, Fn, General, Op, Prog, Program, Returning, Same, Type}
 
 // THE VOCABULARY'S MIRROR: as the Java API's okay.kernel.std, for Scala.js and Scala Native
 
@@ -356,6 +356,18 @@ object Handlers {
 
   /** `acquire`, then `use` of it, then `release` of it — after a value, a failure or a cancellation alike; the
    * acquiring and the registering of the release one region cancellation waits for */
+  trait Translation { def apply[X](op: Op[X]): Program[X] }
+  private def translating[A](t: Type, f: Translation): Translating[A, A] = new Translating[A, A] {
+    def effect(): Type = t
+    def translate[X](op: Op[X]): Program[X] = f(op)
+  }
+  def translate[A](t: Type, f: Translation, body: Program[A]): Program[A] = new Program[A] {
+    def in(e: Effects): Prog[A] = e.handle(translating[A](t, f), body)
+  }
+  def intercept[A](t: Type, f: Translation, body: Program[A]): Program[A] = new Program[A] {
+    def in(e: Effects): Prog[A] = e.intercept(translating[A](t, f), body)
+  }
+
   def bracket[R, A](acquire: Program[R], use: Fn[R, Program[A]], release: Fn[R, Program[Void]]): Program[A] =
     (e: Effects) => e.flatMap[R, A](e.uncancelable(acquire), (r: R) => e.ensuring(use.apply(r), release.apply(r)))
 }

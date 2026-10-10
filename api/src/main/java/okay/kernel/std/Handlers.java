@@ -13,6 +13,7 @@ import okay.kernel.Op;
 import okay.kernel.Prog;
 import okay.kernel.Program;
 import okay.kernel.Returning;
+import okay.kernel.Translating;
 import okay.kernel.Same;
 import okay.kernel.Type;
 import okay.kernel.std.Results.Err;
@@ -224,6 +225,33 @@ public final class Handlers {
 
 
   public static <W> Program<Void> send(Type t, W w) { return e -> e.perform(new Emit.Send<>(t, w)); }
+
+  // -- effects from effects
+
+  /** ONE'S EFFECT ON ANOTHER: each operation of {@code t} a program {@code f(op)} outside the handler, the rest of the
+   * body resumed with its value — an audit to a writer, a ticket on a state */
+  public static <A> Program<A> translate(Type t, Translation f, Program<A> body) {
+    return e -> e.handle(translating(t, f), body);
+  }
+
+  /** AN INTERCEPTOR of {@code t}, handled outside: each operation of the body a program {@code f(op)}, whose own
+   * operations of {@code t} go to the handler outside — what {@code t} does in the body changed, not its effects */
+  public static <A> Program<A> intercept(Type t, Translation f, Program<A> body) {
+    return e -> e.intercept(translating(t, f), body);
+  }
+
+  /** an operation's translation: a program of its value — a generic method, so an anonymous class, as Java's lambdas
+   * are not generic */
+  public interface Translation {
+    <X> Program<X> apply(Op<X> op);
+  }
+
+  private static <A> Translating<A, A> translating(Type t, Translation f) {
+    return new Translating<A, A>() {
+      public Type effect() { return t; }
+      public <X> Program<X> translate(Op<X> op) { return f.apply(op); }
+    };
+  }
 
   // -- finalizers
 

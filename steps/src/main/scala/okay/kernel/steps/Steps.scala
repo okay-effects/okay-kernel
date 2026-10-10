@@ -71,6 +71,9 @@ object Steps extends Effects {
   private final class FRestore(val outcome: Outcome) extends Frame
   /** another implementation's program waiting on an operation answered here: its `k` */
   private final class FForeign(val k: Resume[Any, Any]) extends Frame
+  /** a translating handler's program running outside it: its value given to the body, `frames` back in front — no `k`
+   * made. A failure or a cancellation passes it as a clause's does: the body left */
+  private final class FResumeWith(val frames: List[Frame]) extends Frame
   /** a foreign program being cancelled, its finalizers' steps answered here: when it ends, `outcome` goes on */
   private final class FAfter(val outcome: Outcome) extends Frame
 
@@ -171,6 +174,7 @@ object Steps extends Effects {
                 if (cancelPending) { cancelPending = false; out = Cancelling } else out = r
               case fr: FRestore => out = fr.outcome
               case fa: FAfter => out = fa.outcome
+              case rw: FResumeWith => stack = rw.frames ::: stack; out = r
               case f: FForeign =>
                 foreignStep(f.k.resume(r.v), stack) match { case fs: ForeignNext => stack = fs.stack; out = fs.out }
             }
@@ -243,6 +247,9 @@ object Steps extends Effects {
           new Performed(stack, try new Ret(a.value(op)) catch { case t: Throwable if nonFatal(t) => new Thrown(t) })
         case a: Aborting[Any, Any] @unchecked =>
           new Performed(stack, try new Thrown(new Abort(frame, a.abort(op))) catch { case t: Throwable if nonFatal(t) => new Thrown(t) })
+        case t: Translating[Any, Any] @unchecked =>
+          // the program outside the handler, the rest of the body then resumed with its value: no capture of `k`
+          new Performed(new FResumeWith(stack.take(i + 1)) :: stack.drop(i + 1), guarded(build(t.translate(op))))
         case g: General[Any, Any] @unchecked =>
           val captured = stack.take(i + 1)
           val k = new Fn[Any, Prog[Any]] { def apply(x: Any): Prog[Any] = new ResumeN[Any](captured, x, null) }

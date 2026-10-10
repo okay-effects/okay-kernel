@@ -97,6 +97,7 @@ trait Effects {
   def delay[A](p: Thunk[Prog[A]]): Prog[A]
   def perform[X](op: Op[X]): Prog[X]
   def handle[A, R](h: Handler[A, R], body: Program[A]): Prog[R]
+  def intercept[A](h: Handler[A, A], body: Program[A]): Prog[A] = handle(h, body)
   def shift0[A, I, O](body: Fn[Fn[A, Prog[I]], Prog[O]]): Prog[A]
   def dollar[A, I, O](body: Program[A], k: Fn[A, Prog[I]]): Prog[O]
   def failed[A](e: Throwable): Prog[A]
@@ -111,6 +112,7 @@ trait Handler[A, R] { def effect(): Type }
 trait Answering[A, R] extends Handler[A, R] { def value[X](op: Op[X]): X }
 trait Aborting[A, R] extends Handler[A, R] { def abort[X](op: Op[X]): R }
 trait Returning[A, R] extends Handler[A, R] { def answer(a: A): R }
+trait Translating[A, R] extends Handler[A, R] { def translate[X](op: Op[X]): Program[X] }
 trait General[A, R] extends Handler[A, R] {
   def ret(a: A, e: Effects): Prog[R]
   def apply[X](op: Op[X], k: Fn[X, Prog[R]], e: Effects): Prog[R]

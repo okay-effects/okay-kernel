@@ -25,6 +25,13 @@ public interface Effects {
   /** {@code body} under the handler {@code h}: a delimiter, its effect taken off */
   <A, R> Prog<R> handle(Handler<A, R> h, Program<A> body);
 
+  /** {@code body} under {@code h}, an INTERCEPTOR of an effect handled outside it: the body's operations of
+   * {@code h.effect()} go to {@code h}; its clauses' own to the handler outside — so it changes what an effect does
+   * in the body, not which effects the body has. The handler is a delimiter as any */
+  default <A> Prog<A> intercept(Handler<A, A> h, Program<A> body) {
+    return handle(h, body);
+  }
+
   /** the rest up to the nearest delimiter, the delimiter included, as {@code k}; {@code body} runs outside it, in its
    * place */
   <A, I, O> Prog<A> shift0(Fn<Fn<A, Prog<I>>, Prog<O>> body);
