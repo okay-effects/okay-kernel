@@ -9,7 +9,7 @@ object Programs:
   def p(a: Int): Int ! Writer % String + Async =
     for
       _ <- tell("got " + a)
-      x <- await(a + 1)
+      x <- awaitNow(a + 1)
       _ <- tell("awaited " + x)
     yield x * 2
 

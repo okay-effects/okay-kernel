@@ -17,13 +17,46 @@ package okay.kernel
 trait Fn[-A, +B]:
   def apply(a: A): B
 
+/** a value taken, nothing given back: Java's `void` — a callback */
+trait Sink[-A]:
+  def accept(a: A): Unit
+
 /** a value computed when asked */
 trait Thunk[+A]:
   def get(): A
 
-/** AN EFFECT: what a handler takes — by identity. `name` for errors and other languages' wire */
-final class Effect(val name: String):
+/** AN EFFECT: what a handler takes — by identity. `Effect(name)` a fresh one each call: a prompt, a delimiter of
+ * its own (a reset's); `Effect.of(name, types)` the same one for the same name and types: `Writer % String` and
+ * `Writer % Int` two effects, `Writer % String` one, in every language */
+final class Effect private (val name: String):
   override def toString: String = name
+
+object Effect:
+  /** a fresh effect: no other is it */
+  def apply(name: String): Effect = new Effect(name)
+
+  private val known = scala.collection.mutable.HashMap.empty[String, Effect]
+
+  /** the effect of this name over these types (their class names, primitives boxed): one for all who ask */
+  @scala.annotation.varargs
+  def of(name: String, types: String*): Effect =
+    val key = if types.isEmpty then name else types.mkString(name + "[", ",", "]")
+    known.synchronized(known.getOrElseUpdate(key, new Effect(key)))
+
+  /** a type's name for `of`: its class's, a primitive's box's — Java's `int` and `Integer`, Scala's `Int`, one */
+  def typeName(c: Class[?]): String =
+    if !c.isPrimitive then c.getName
+    else c.getName match
+      case "int" => "java.lang.Integer"
+      case "long" => "java.lang.Long"
+      case "boolean" => "java.lang.Boolean"
+      case "double" => "java.lang.Double"
+      case "float" => "java.lang.Float"
+      case "short" => "java.lang.Short"
+      case "byte" => "java.lang.Byte"
+      case "char" => "java.lang.Character"
+      case "void" => "scala.runtime.BoxedUnit"
+      case n => n
 
 /** AN OPERATION of an effect, as data, its value `A` */
 trait Op[A]:
