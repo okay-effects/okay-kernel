@@ -65,52 +65,56 @@ in Scala, `okay.jkernel.*` in Java), so both jars share one classpath. An operat
 `null`: Java's continuations cast to `Void`. On Scala.js and Scala Native, with no Java, the API is its Scala mirror
 (`src/main/scala-mirror`): the same signatures, invariant as Java's.
 
-## The ecosystem: the kernel over two libraries
+## The ecosystem: one protocol, the implementations apart
 
-okay-core (Scala 3) and okay-java (Java) are libraries of their own, of no dependency: neither knows the kernel. The
-kernel is the layer over them — the API every language and platform shares, its machines, and an adapter a library:
-`OnCore` (`okaycore/`) runs the kernel's programs on okay-core's machines, `OnJava` (`okayjava/`) on okay-java's. The kernel's own Java — a machine of the
-API and the standard handlers in Java — is the module `java/` (`dev.okay:okay-kernel-java`, `okay.jkernel`), built
-here; okay-java stays a library.
+okay-core (Scala 3), okay-java (Java), okay (the platform) and okay-one (the kernel being written, where okay-core's
+one monad comes from) are libraries of their own. The kernel is the layer they share — the API every language and
+platform reads, the TCK, the reference machines — and each implements it in its own repository, or here where it has
+no other home:
 
-## The monads
+- `okay.core.kernel.OnCore.zero`, `.cont` (okay-core): the kernel's programs the machines' own nodes, operations
+  found by their key's identity, export and import ([okay-core's docs/kernel.md](../okay-core/docs/kernel.md));
+- `okay.core.Kernel.EFFECTS` (okay-java, branch `kernel-native`): a capture per `k`, nothing allocated a delimiter
+  crossed ([okay-java's docs/kernel.md](../okay-java/docs/kernel.md));
+- `okay.kernel.onone.OnOne` (`one/` here): okay-one's machine — every delimiter of the bridge a `Deep` handler of
+  one request effect over one row, `k` data, export through okay-one's `Step`;
+- `okay.kernel.onokay.OnOkay` (`okay/` here): okay's machine — every delimiter a `Reset`, every request a `Shift0`;
+- `Steps` (`steps/`, Scala) and `StepsJava` (`steps-java/`, Java): the reference — a step a node over an explicit
+  stack of frames, the TCK's digest theirs.
 
-- `Steps`: okay-java's machine — nodes over an explicit stack of handlers on the heap, handlers nested as deep as
-  the heap allows, one step a kind of node.
-- `Ref` (tests): the textbook, recursive — what every monad must agree with.
-- `OnCore.zero`, `OnCore.cont` (`okaycore/`): okay-core's machines through its `Effects`.
-- Both adapters are `Direct` (`okay.kernel.Direct`, optional, Scala's): Scala 3's typed programs built in the
-  library's own nodes, no kernel `Prog` around each node; Java's programs and the handlers by `Monad`. The standard
-  handlers are `Returning`: okay-core's own handler under `OnCore`, nothing flattened.
-- `OnJava.monad` (`okayjava/`): okay-java's machine of prompts — a handler an `Eff.handle`, an operation `shift0` to
-  the prompt of the nearest handler of its effect, an answering one's `Eff.sync`, no capture.
-- `okay.jkernel.Steps` (`java/`): the machine in Java, compiled by javac against the API's jar — the same random
-  programs, the same outcomes (`TestAgree`, and `AgreeTest` in Java).
+`integration/` runs the TCK on each of okay-core's two, okay-java, okay-one and the two references in one process,
+each importing the others' computations: 96 checks. okay is checked by its own module's TCK (its `okay.cont.*` and
+okay-core's are one name, two classes).
 
 ## What the kernel costs
 
 okay-java's mixed program (1000 orders: a reader's base, the first of three suppliers, a failure caught per order, a
-state, a log), written once over `Effects`, on each implementation (bench/, JDK 26, JMH `-f 2 -wi 5 -i 5`):
+state, a log), written once over `Effects`, on each implementation — beside the same program in each one's own words
+(`~/work/my/okay-bench`, 2026-10-13, JDK 26, JMH `-f 2 -wi 5 -i 5`, µs a run of 1000 orders, bytes a run):
 
-| implementation | µs | B / order | its own program, in its own words |
-|---|---|---|---|
-| okay-java (`okay.core.Kernel`, native) | 245 | 1767 | 182 (okay-java's MixedBenchmark, JDK 26) |
-| okay-core cont (`OnCore.cont`, native) | 314 | 2395 | 142 |
-| okay-core zero (`OnCore.zero`, native) | 348 | 2089 | 125 |
-| steps-java (the reference, Java) | 405 | 2520 | — |
-| steps (the reference, Scala) | 524 | 2414 | — |
+| implementation | the protocol's program | B | its own program | B |
+|---|---|---|---|---|
+| okay-java (`okay.core.Kernel`) | 237 | 1 731 610 | 102 (cell) / 172 (state) | 1 025 313 / 1 352 001 |
+| okay-core cont (`OnCore.cont`) | 247 | 1 895 962 | 147 | 1 415 329 |
+| okay-core zero (`OnCore.zero`) | 310 ± 119 | 1 828 738 | 124 | 1 308 757 |
+| steps-java (the reference, Java) | 427 | 2 484 411 | — | — |
+| okay-one (`OnOne`, the first cut) | 449 | 2 754 379 | 165 | 1 023 681 |
+| steps (the reference, Scala) | 535 | 2 378 644 | — | — |
+| okay (`OnOkay`) | 557 | 4 405 892 | — | — |
 
-The implementations' own typed programs are unchanged by implementing the kernel (okay-core's changelog.d/kernel-native.md,
-okay-java's docs/kernel.md). The kernel's path on okay-core is being made faster.
-## Scala 3's typed view (`okay`, `okay.std`)
+The protocol's program costs about twice each one's own on the native bridges (okay-java, okay-core): `Program.in`,
+the `Fn` closures and the standard handlers built per order. `OnOne` is the first cut — every kernel handler a `Deep`
+clause and a level of `k`, every operation a request and a read of its answer; what okay-core's native path went
+through (474 → 231) is ahead of it.
 
-`A ! R` is `Eff[R, A]`, a `Program[A]` with its effects in its type: `R` an intersection, `Writer % String + Async`
-being `Writer[String] & Async`; contravariant, so a program needing fewer effects is one needing more. A handler
-takes its effect off the row: `writer(p: A ! (Writer[W] & R)): (List[W], A) ! R`. Programs of other languages come in
-by `Eff.from`, their effects as said, checked at run time.
+## Scala's own (`scala/`, `dev.okay::okay-kernel-scala`)
+
+`okay.kernel.types`: `TypeOf`, exact types found by the compiler (classes, applied up to three, `A @@ T` tagged by
+a singleton's value or a class), named by hand for anything else — `State.key[Int](typeOf[Int])`; on Scala.js and
+Scala Native the API's mirror, the same names and signatures. One source for Scala 3 and 2.13.
 
 ## Tests
 
-`sbt test`: the same suite on every monad, on the JVM, Scala.js and Scala Native; Java's programs and Scala 3's in
-one, both ways (`src/test/scala-jvm`); the Java module's jar with the Scala one, in one run (`TestBinary`); the Java
-module's own, JUnit (`java/`); Scala 2's (`scala2/`).
+`sbt test`: the API's (Java, JUnit), Scala's on the JVM, Scala.js and Scala Native, the reference machines' (Scala
+and Java), the TCK on each implementation in its module (`one/`, `okay/`) and on all of them in one process
+(`integration/`) — Scala 3 and 2.13.

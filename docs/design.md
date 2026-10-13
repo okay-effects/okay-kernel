@@ -184,6 +184,9 @@ okay-kernel/
                             Native the API's mirror. One source for Scala 3 and 2.13, on the JVM, JS and Native
   tck     okay-kernel-tck   the protocol's checks: export, import, multi-shot k, a resume from another thread,
                             nesting through three systems; random programs, one digest
+  one     okay-kernel-one   okay-one as an implementation: OnOne, every delimiter of the bridge a Deep handler of one
+                            request effect, export through Step; its TCK
+  okay    okay-kernel-okay  okay as an implementation: OnOkay on okay's machine; okay's programs on the kernel
   legacy/ the kernel before the protocol, unchanged, until each part moves onto the API or to its own repository
   …       what has no other home, each a module of its own (§7)
 ```
