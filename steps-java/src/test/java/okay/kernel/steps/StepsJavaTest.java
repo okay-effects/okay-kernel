@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import okay.kernel.Control;
 import okay.kernel.Key;
 import okay.kernel.Answers;
 import okay.kernel.Computation;
@@ -97,9 +98,9 @@ class StepsJavaTest {
 
   @Test void shift0AndDollarTheLaws() {
     Fn<Integer, Prog<Integer>> k = x -> M.pure(x * 2);
-    assertEquals(42, run((Program<Integer>) e -> e.<Integer, Integer, Integer>dollar(e2 -> e2.pure(21), k)));
-    Program<Integer> shifted = e -> e.<Integer, Integer, Integer>shift0(kk -> e.flatMap(kk.apply(1), kk));
-    assertEquals(21, run((Program<Integer>) e -> e.<Integer, Integer, Integer>dollar(shifted, x -> e.pure(x + 10))));
+    assertEquals(42, run((Program<Integer>) e -> Control.of(e).<Integer, Integer, Integer>dollar(e2 -> e2.pure(21), k)));
+    Program<Integer> shifted = e -> Control.of(e).<Integer, Integer, Integer>shift0(kk -> e.flatMap(kk.apply(1), kk));
+    assertEquals(21, run((Program<Integer>) e -> Control.of(e).<Integer, Integer, Integer>dollar(shifted, x -> e.pure(x + 10))));
   }
 
   @Test void aGeneratorPulledOneByOne() {

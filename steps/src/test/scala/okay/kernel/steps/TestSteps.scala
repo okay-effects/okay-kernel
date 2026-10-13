@@ -62,9 +62,9 @@ class TestSteps extends FunSuite {
 
   test("shift0 and $: the laws") {
     val k = fn((x: Integer) => Steps.pure(Integer.valueOf(x * 2)))
-    assertEquals(run(prog(e => e.dollar[Integer, Integer, Integer](prog(_.pure(Integer.valueOf(21))), k))).intValue, 42)
-    val shifted = prog(e => e.shift0[Integer, Integer, Integer](fn((kk: Fn[Integer, Prog[Integer]]) => e.flatMap(kk(1), fn((a: Integer) => kk(a))))))
-    assertEquals(run(prog(e => e.dollar[Integer, Integer, Integer](shifted, fn((x: Integer) => e.pure(Integer.valueOf(x + 10)))))).intValue, 21)
+    assertEquals(run(prog(e => Control.of(e).dollar[Integer, Integer, Integer](prog(_.pure(Integer.valueOf(21))), k))).intValue, 42)
+    val shifted = prog(e => Control.of(e).shift0[Integer, Integer, Integer](fn((kk: Fn[Integer, Prog[Integer]]) => e.flatMap(kk(1), fn((a: Integer) => kk(a))))))
+    assertEquals(run(prog(e => Control.of(e).dollar[Integer, Integer, Integer](shifted, fn((x: Integer) => e.pure(Integer.valueOf(x + 10)))))).intValue, 21)
   }
 
   test("a generator: values pulled one by one") {

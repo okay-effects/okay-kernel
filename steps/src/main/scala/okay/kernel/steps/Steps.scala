@@ -15,7 +15,7 @@ import okay.kernel._
  * program bound it to — the types agree because the program was built typed and an operation's handler is found by
  * its effect's exact identity. In the subset Scala 2.13 and 3 share, on every platform.
  */
-object Steps extends Effects {
+object Steps extends Effects with Control {
 
   // -- the programs: nodes, the value's type a phantom
 

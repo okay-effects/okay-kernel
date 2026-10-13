@@ -8,6 +8,7 @@ import okay.kernel.Aborting;
 import okay.kernel.Answering;
 import okay.kernel.Answers;
 import okay.kernel.Computation;
+import okay.kernel.Control;
 import okay.kernel.Effects;
 import okay.kernel.Fn;
 import okay.kernel.General;
@@ -38,7 +39,7 @@ import okay.kernel.Type;
  * value is given to the function the program bound it to — the types agree because the program was built typed and an
  * operation's handler is found by its effect's exact identity.
  */
-public final class StepsJava implements Effects {
+public final class StepsJava implements Effects, Control {
   /** the machine */
   public static final StepsJava INSTANCE = new StepsJava();
 

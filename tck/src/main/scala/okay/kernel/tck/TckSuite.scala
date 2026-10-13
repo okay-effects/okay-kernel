@@ -33,9 +33,12 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
     assertEquals(run(e, bind(m, fn((a: Integer) => prog(_.pure(a))))), run(e, m))
     assertEquals(run(e, bind(bind(m, f), g)), run(e, bind(m, fn((a: Integer) => bind(f(a), g)))))
     val k = fn((x: Integer) => e.pure(int(x * 2)))
-    assertEquals(run(e, prog(x => x.dollar[Integer, Integer, Integer](prog(_.pure(int(21))), fn((v: Integer) => x.pure(int(v * 2)))))).intValue, 42)
-    val twice = prog(x => x.shift0[Integer, Integer, Integer](fn((kk: Fn[Integer, Prog[Integer]]) => x.flatMap(kk(int(1)), fn((a: Integer) => kk(a))))))
-    assertEquals(run(e, prog(x => x.dollar[Integer, Integer, Integer](twice, fn((v: Integer) => x.pure(int(v + 10)))))).intValue, 21)
+    // control, if the implementation has it: apart from Effects
+    if (e.isInstanceOf[Control]) {
+      assertEquals(run(e, prog(x => Control.of(x).dollar[Integer, Integer, Integer](prog(_.pure(int(21))), fn((v: Integer) => x.pure(int(v * 2)))))).intValue, 42)
+      val twice = prog(x => Control.of(x).shift0[Integer, Integer, Integer](fn((kk: Fn[Integer, Prog[Integer]]) => x.flatMap(kk(int(1)), fn((a: Integer) => kk(a))))))
+      assertEquals(run(e, prog(x => Control.of(x).dollar[Integer, Integer, Integer](twice, fn((v: Integer) => x.pure(int(v + 10)))))).intValue, 21)
+    }
     assert(k != null)
   }
 
@@ -133,9 +136,10 @@ abstract class TckSuite(name: String, e: Effects, others: List[Effects] = Nil) e
   }
 
   test(s"$name: a shift0's body runs outside its delimiter — a handler between is not in force there") {
+    assume(e.isInstanceOf[Control], s"$name has no delimited control")
     val p = Handlers.reader[Integer, Integer](rd, int(1), prog { x =>
-      x.dollar[Integer, Integer, Integer](
-        Handlers.reader[Integer, Integer](rd, int(2), prog(y => y.shift0[Integer, Integer, Integer](fn((_: Fn[Integer, Prog[Integer]]) => ask.in(y))))),
+      Control.of(x).dollar[Integer, Integer, Integer](
+        Handlers.reader[Integer, Integer](rd, int(2), prog(y => Control.of(y).shift0[Integer, Integer, Integer](fn((_: Fn[Integer, Prog[Integer]]) => ask.in(y))))),
         fn((v: Integer) => x.pure(v)))
     })
     assertEquals(run(e, p).intValue, 1)

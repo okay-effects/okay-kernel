@@ -2,10 +2,10 @@ package okay.kernel;
 
 /**
  * WHAT AN IMPLEMENTATION OFFERS CODE WRITTEN ONCE: its programs, built and bound; an operation, to the nearest
- * handler of its effect; a handler, a delimiter; the minimal control, {@code shift0} and {@code $}; failures,
- * finalizers and regions cancellation waits for. The answer types are only parameters here: the fronts check them.
- * Each implementation's bridge implements it on its own machine; the standard handlers, written once over it, work
- * in every one
+ * handler of its effect; a handler, a delimiter; failures, finalizers and regions cancellation waits for. The answer
+ * types are only parameters here: the fronts check them. Each implementation's bridge implements it on its own
+ * machine; the standard handlers, written once over it, work in every one. Delimited control ({@code shift0},
+ * {@code $}) is apart, {@link Control}: an implementation has it or not
  */
 public interface Effects {
   <A> Prog<A> pure(A a);
@@ -31,13 +31,6 @@ public interface Effects {
   default <A> Prog<A> intercept(Handler<A, A> h, Program<A> body) {
     return handle(h, body);
   }
-
-  /** the rest up to the nearest delimiter, the delimiter included, as {@code k}; {@code body} runs outside it, in its
-   * place */
-  <A, I, O> Prog<A> shift0(Fn<Fn<A, Prog<I>>, Prog<O>> body);
-
-  /** {@code body} under a fresh delimiter, its value given to {@code k}: {@code body $ k} */
-  <A, I, O> Prog<O> dollar(Program<A> body, Fn<A, Prog<I>> k);
 
   /** a failure: an exception, as a program */
   <A> Prog<A> failed(Throwable e);

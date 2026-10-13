@@ -1,7 +1,7 @@
 package okay.kernel.onokay
 
 import okay.cont.{At, Cont, Machine}
-import okay.kernel.{Aborting, Answering, Answers, Computation, Effects, Fn, General, Handler, Op, Prog, Program, Resume,
+import okay.kernel.{Aborting, Answering, Answers, Computation, Control, Effects, Fn, General, Handler, Op, Prog, Program, Resume,
   Returning, Step, Thunk, Translating, Type}
 import scala.util.control.NonFatal
 
@@ -50,7 +50,7 @@ import scala.util.control.NonFatal
  * expects it) and `level` (okay's stack indices are phantom types the machine never reads: the bridge's programs are
  * built at one index, `U`, and a `Reset`'s body and a `Shift0` are seen at it).
  */
-object OnOkay extends Effects:
+object OnOkay extends Effects with Control:
 
   override def toString: String = "OnOkay"
 

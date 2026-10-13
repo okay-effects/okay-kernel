@@ -118,11 +118,17 @@ interface Effects {
   <A> Prog<A> delay(Thunk<Prog<A>> p);
   <X> Prog<X> perform(Op<X> op);
   <A, R> Prog<R> handle(Handler<A, R> h, Program<A> body);
-  // control, the minimal pair: the answer types at the binary level only parameters, checked by the fronts
+}
+interface Program<A> { Prog<A> in(Effects e); }
+
+// control, the minimal pair, APART: an implementation has it or not — `Control.of(e)`. The answer types at the
+// binary level only parameters, checked by the fronts. Why apart: a program of effects carries no answer types, which
+// is what lets it run under any handlers; answer-type modification is a front's own (a CPS type beside), not the
+// kernel's; and shift0 as an effect with a fixed answer per delimiter is what okay itself uses
+interface Control {
   <A, I, O> Prog<A> shift0(Fn<Fn<A, Prog<I>>, Prog<O>> body);   // k the rest up to the nearest delimiter
   <A, I, O> Prog<O> dollar(Program<A> body, Fn<A, Prog<I>> k);   // body under a fresh delimiter, its value to k
 }
-interface Program<A> { Prog<A> in(Effects e); }
 
 interface Handler<A, R>   { Type effect(); }                       // a handler is a delimiter too
 interface Answering<A, R> extends Handler<A, R> { <X> X value(Op<X> op); }   // answered in place
@@ -139,7 +145,7 @@ interface General<A, R>   extends Handler<A, R> {                            // 
 | `Answering` | no | State (a cell), Reader, Emit's `forEach` |
 | `Aborting` | no | Throws |
 | `Returning` | no | almost all: Writer, Throws, Choose, State |
-| `General` | yes | Choose (all, first), Writer (functional), Emit's generators, Async, Control, `ensuring`, `bracket` |
+| `General` | yes | Choose (all, first), Writer (functional), Emit's generators, Async, `ensuring`, `bracket` |
 
 A handler may be two at once: a cell is `Answering` and `Returning`, `Choose` `General` and `Returning`. The first
 three are data, no `Effects`: an implementation's bridge makes them its own handlers once, at no cost (`Returning`
@@ -161,7 +167,7 @@ platform (threads, timers: a hook), and programs where speed matters — they ru
 So that `Get` of okay and `Get` of okay-java mean one thing, the API declares the standard effects — their
 families, their operations as data, their `Type`s, and their laws, checked by the TCK:
 
-`State`, `Reader`, `Writer`, `Throws`, `Choose`, `Emit`, `Async`, `Control` — and finalizers: `ensuring`, `bracket`.
+`State`, `Reader`, `Writer`, `Throws`, `Choose`, `Emit`, `Async` — and finalizers: `ensuring`, `bracket`.
 
 Each operation family is a sealed interface of records with its CASES AS A VISITOR (`Cases`, each case's `fold`,
 proofs `Same<A, B>` whose only case is `Refl`): a handler written in Java or Scala 2 is total and typed with no
@@ -200,7 +206,7 @@ Scala 3, `lexical`, `Cont` in Java.
 
 ## 8. Decided
 
-`Effects` its name; control (`shift0`, `$`) its methods; `Aborting` a shape; failures and cancellation outcomes of a
+`Effects` its name; control (`shift0`, `$`) apart, `Control`, an implementation's to have or not (2026-10-13: it was `Effects`' methods); `Aborting` a shape; failures and cancellation outcomes of a
 step; the runtime row `Computation.effects()`, checked at the border; an operation's value type `Op.value()`,
 checked in a debug mode; implementations depend on the API and implement it directly (no `Direct`); `uncancelable` regions in
 version 1.

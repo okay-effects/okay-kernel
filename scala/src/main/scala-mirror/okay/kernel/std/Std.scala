@@ -150,21 +150,6 @@ object Async {
   }
 }
 
-final class Control private ()
-object Control {
-  def delimiter(): Key[Control] = Key.fresh[Control]()
-  def narrow[X](key: Key[Control], op: Op[X]): Ops[X] =
-    if (key.owns(op) && op.isInstanceOf[Ops[?]]) op.asInstanceOf[Ops[X]]
-    else throw new IllegalArgumentException("not an operation of " + key + ": " + op)
-  trait Ops[X] extends Op[X] { def fold[R](c: Cases[X, R]): R }
-  trait Cases[X, R] { def capture(body: Fn[Fn[X, Program[Any]], Program[Any]]): R }
-  final case class Capture[X](private val k: Key[Control], private val b: Fn[Fn[X, Program[Any]], Program[Any]]) extends Ops[X] {
-    def key(): Key[?] = k
-    def body(): Fn[Fn[X, Program[Any]], Program[Any]] = b
-    def fold[R](c: Cases[X, R]): R = c.capture(b)
-  }
-}
-
 /** THE STANDARD HANDLERS' ANSWERS, as data every language reads */
 object Results {
   /** a state's final value with the body's */

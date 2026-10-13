@@ -103,6 +103,18 @@ trait Prog[A]
 
 trait Program[A] { def in(e: Effects): Prog[A] }
 
+/** delimited control, apart from `Effects`: an implementation has it or not — `Control.of(e)` */
+trait Control {
+  def shift0[A, I, O](body: Fn[Fn[A, Prog[I]], Prog[O]]): Prog[A]
+  def dollar[A, I, O](body: Program[A], k: Fn[A, Prog[I]]): Prog[O]
+}
+object Control {
+  def of(e: Effects): Control = e match {
+    case c: Control => c
+    case _ => throw new UnsupportedOperationException(e.toString + " has no delimited control")
+  }
+}
+
 trait Effects {
   def pure[A](a: A): Prog[A]
   def flatMap[A, B](p: Prog[A], f: Fn[A, Prog[B]]): Prog[B]
@@ -111,8 +123,6 @@ trait Effects {
   def perform[X](op: Op[X]): Prog[X]
   def handle[A, R](h: Handler[A, R], body: Program[A]): Prog[R]
   def intercept[A](h: Handler[A, A], body: Program[A]): Prog[A] = handle(h, body)
-  def shift0[A, I, O](body: Fn[Fn[A, Prog[I]], Prog[O]]): Prog[A]
-  def dollar[A, I, O](body: Program[A], k: Fn[A, Prog[I]]): Prog[O]
   def failed[A](e: Throwable): Prog[A]
   def recover[A](body: Program[A], h: Fn[Throwable, Prog[A]]): Prog[A]
   def ensuring[A](body: Program[A], finalizer: Program[Void]): Prog[A]

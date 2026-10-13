@@ -30,11 +30,11 @@ class TestTypes extends FunSuite {
   })
 
   test("a handler's clause in the portable form: total and typed, no cast") {
-    val st = State.of(typeOf[Int])
+    val st = State.key[Int](typeOf[Int])
     assertEquals(clause(new State.Get[Int](st), (x: Int) => s"got $x"), "got 1")
     assertEquals(clause(new State.Put[Int](st, 5), (_: Void) => "put"), "put")
     assertEquals(clause(new State.Get[Int](st), (x: Int) => s"got $x"), "got 5")
-    val raised = new Throws.Raise[String, Int](Throws.of(typeOf[String]), "boom")
+    val raised = new Throws.Raise[String, Int](Throws.key[String](typeOf[String]), "boom")
     assertEquals(raised.fold(new Throws.Cases[String, Int, String] { def raise(e: String): String = s"caught $e" }), "caught boom")
     assert(new Choose.Among[Int](java.util.Arrays.asList(1, 2)).effect() eq Choose.TYPE)
   }
