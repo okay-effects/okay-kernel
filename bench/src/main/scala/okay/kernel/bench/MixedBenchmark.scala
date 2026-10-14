@@ -9,7 +9,7 @@ import okay.kernel.steps.{Steps, StepsJava}
 /**
  * okay-java's MIXED PROGRAM, WRITTEN ONCE over the kernel's `Effects`: n orders, each priced from a reader's base,
  * its supplier the first of three that fits (a choice), a failure for some (a raise, a handler per order), the total a
- * state, the failures a log — run on every implementation: the reference machines, okay-core's two and okay-java's,
+ * state, the failures a log — run on every implementation: the reference machines, okay-core's (the one monad) and okay-java's,
  * each implementing the API itself. Against okay-core's own MixedBenchmark (the same program in okay-core's words)
  */
 @JmhState(Scope.Thread)
@@ -19,7 +19,7 @@ import okay.kernel.steps.{Steps, StepsJava}
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(2)
 class MixedBenchmark {
-  @Param(Array("steps", "steps-java", "okay-core-zero", "okay-core-cont", "okay-java"))
+  @Param(Array("steps", "steps-java", "okay-core", "okay-java"))
   var impl: String = ""
   @Param(Array("1000"))
   var n: Int = 0
@@ -29,8 +29,7 @@ class MixedBenchmark {
   @Setup def setup(): Unit = e = impl match {
     case "steps" => Steps
     case "steps-java" => StepsJava.INSTANCE
-    case "okay-core-zero" => okay.core.kernel.OnCore.zero
-    case "okay-core-cont" => okay.core.kernel.OnCore.cont
+    case "okay-core" => okay.core.kernel.OnCore
     case "okay-java" => okay.core.Kernel.EFFECTS
   }
 
