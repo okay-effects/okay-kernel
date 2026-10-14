@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 import org.openjdk.jmh.annotations.{State => JmhState, _}
 import okay.kernel._
 import okay.kernel.std.{Handlers, Reader, Results, State, Throws, Writer}
-import okay.kernel.steps.{Steps, StepsJava}
+import okay.kernel.steps.Steps
 
 /**
  * okay-java's MIXED PROGRAM, WRITTEN ONCE over the kernel's `Effects`: n orders, each priced from a reader's base,
@@ -19,7 +19,7 @@ import okay.kernel.steps.{Steps, StepsJava}
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(2)
 class MixedBenchmark {
-  @Param(Array("steps", "steps-java", "okay-core", "okay-java"))
+  @Param(Array("steps", "okay-core", "okay-java"))
   var impl: String = ""
   @Param(Array("1000"))
   var n: Int = 0
@@ -28,7 +28,6 @@ class MixedBenchmark {
 
   @Setup def setup(): Unit = e = impl match {
     case "steps" => Steps
-    case "steps-java" => StepsJava.INSTANCE
     case "okay-core" => okay.core.kernel.OnCore
     case "okay-java" => okay.core.Kernel.EFFECTS
   }

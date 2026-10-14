@@ -11,7 +11,6 @@ handlers written in another. The design: [docs/design.md](docs/design.md).
 | `api` (`okay-kernel-api`) | the protocol and the API, pure Java, no dependency: `Type` (an effect's exact identity), `Op`, `Computation`, `Step` (`Done`, `Yield`, `Failed`, `Cancelled`), `Resume` (`resume`, `fail`, `cancel`), `Answers`; code written once over `Effects`; the shapes of handlers; `Direct`; the vocabulary of standard effects and its handlers written once (`std.Handlers`) |
 | `scala` (`okay-kernel-scala`) | Scala's own: `TypeOf` (exact types found by the compiler), `@@`; on Scala.js and Scala Native the API's mirror. Scala 3 and 2.13 from one source |
 | `steps` (`okay-kernel-steps`) | the reference machine: `Effects` and the protocol, exact rather than fast. Scala 3 and 2.13, JVM, JS, Native |
-| `steps-java` (`okay-kernel-steps-java`) | the reference machine in pure Java |
 | `tck` (`okay-kernel-tck`) | what every implementation is checked by, on its own `Effects`: laws, standard handlers, the protocol, nesting through implementations, a thousand random programs with one digest |
 | `legacy/` | the kernel before the protocol, unchanged, until each part moves onto the API or to its own repository (`sbt legacy/test`) |
 
@@ -76,11 +75,12 @@ no other home:
   request effect over one row, `k` data, export through `Step` ([okay-core's docs/kernel.md](../okay-core/docs/kernel.md));
 - `okay.core.Kernel.EFFECTS` (okay-java, branch `kernel-native`): a capture per `k`, nothing allocated a delimiter
   crossed ([okay-java's docs/kernel.md](../okay-java/docs/kernel.md));
-- `Steps` (`steps/`, Scala) and `StepsJava` (`steps-java/`, Java): the reference — a step a node over an explicit
-  stack of frames, the TCK's digest theirs.
+- `Steps` (`steps/`): the reference — a step a node over an explicit stack of frames, exact rather than fast, the
+  TCK's digest its; one, in Scala, on every platform (its copy in Java, `steps-java`, is gone, 2026-10-14: one
+  reference is what an independent check needs, two the same interpreter twice).
 
-`integration/` runs the TCK on each of okay-core, okay-java and the two references in one process, each importing
-the others' computations: 64 checks. The okay platform runs on okay-core's one monad (2026-10-14), so its
+`integration/` runs the TCK on each of okay-core, okay-java and the reference in one process, each importing
+the others' computations: 48 checks. The okay platform runs on okay-core's one monad (2026-10-14), so its
 bridge is `OnCore` — the module `okay/` (`OnOkay`, okay-cont's machine) is gone with okay-cont.
 
 ## What the kernel costs
@@ -94,8 +94,7 @@ state, a log), written once over `Effects`, on each implementation — beside th
 | okay-java (`okay.core.Kernel`) | 237 | 1 731 610 | 102 (cell) / 172 (state) | 1 025 313 / 1 352 001 |
 | okay-core cont (`OnCore.cont`) | 247 | 1 895 962 | 147 | 1 415 329 |
 | okay-core zero (`OnCore.zero`) | 310 ± 119 | 1 828 738 | 124 | 1 308 757 |
-| steps-java (the reference, Java) | 427 | 2 484 411 | — | — |
-| okay-core on the one monad (`OnCore`, 2026-10-14) | 459 | 2 918 699 | 230 | 1 443 474 |
+| okay-core on the one monad (`OnCore`, 2026-10-14, a place by key at run time) | 286 | 2 469 170 | 223 | 1 445 313 |
 | steps (the reference, Scala) | 535 | 2 378 644 | — | — |
 | okay (`OnOkay`, okay-cont's machine, gone 2026-10-14) | 557 | 4 405 892 | — | — |
 

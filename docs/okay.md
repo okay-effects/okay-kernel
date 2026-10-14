@@ -1,3 +1,6 @@
+> HISTORY (2026-10-14): `OnOkay` and the module `okay/` are gone — the okay platform runs on okay-core's one monad,
+> its bridge `OnCore`; `StepsJava` is gone too, `Steps` the one reference. Kept as the record of the design.
+
 # okay on the kernel
 
 `okay/` (sbt `okayCompat`, artifact `dev.okay::okay-kernel-okay`, Scala 3.9, JVM) is the bridge between okay and the
@@ -14,7 +17,10 @@ sbt 'set LocalProject("okayContJVM") / publish / skip := false' \
 okay-cont is not in okay's release wave, so it is `publish / skip`. okay's scaladoc currently fails on its JMH
 sources.
 
-## 1. `OnOkay`: okay's machine as the kernel's `Effects`
+#> HISTORY (2026-10-14): `OnOkay` and the module `okay/` are gone — the okay platform runs on okay-core's one monad,
+> its bridge `OnCore`; `StepsJava` is gone too, `Steps` the one reference. Kept as the record of the design.
+
+# 1. `OnOkay`: okay's machine as the kernel's `Effects`
 
 The machine is okay-cont's `Cont`, the nodes `okay.Effects.machine` compiles every `A ! R` to, run by
 `okay.cont.Machine`. A kernel `Prog` is okay's program itself in a box (`OnOkay.P`, holding a `Cont`). `Cont` is
@@ -53,7 +59,10 @@ typed, expects it. `level` exists because okay's `Cont` is indexed by stacks of 
 machine never reads them. The bridge builds its programs at one index; the body of a `Reset`, a `Shift0`, and the
 border's `Target` are the same objects seen one level in.
 
-## 2. okay's own programs
+#> HISTORY (2026-10-14): `OnOkay` and the module `okay/` are gone — the okay platform runs on okay-core's one monad,
+> its bridge `OnCore`; `StepsJava` is gone too, `Steps` the one reference. Kept as the record of the design.
+
+# 2. okay's own programs
 
 `Mapping[E]` says how one of okay's effects is seen by the kernel: its `Type`, its operations as kernel operations,
 and the answers in both directions. `Kernel[R]` maps a whole row, and the compiler builds it from a `Mapping` for each
@@ -80,7 +89,10 @@ effect. The standard mappings, which the caller gives the kernel `Type`s:
   computation's `k`. okay's handlers (`StateCell`, `WriterLog`, `Every`) therefore run kernel programs, multi-shot
   `k` included.
 
-## 3. What is exact, what is approximated
+#> HISTORY (2026-10-14): `OnOkay` and the module `okay/` are gone — the okay platform runs on okay-core's one monad,
+> its bridge `OnCore`; `StepsJava` is gone too, `Steps` the one reference. Kept as the record of the design.
+
+# 3. What is exact, what is approximated
 
 Exact: the reference machine's semantics for `OnOkay`. The TCK passes all 13 checks, including the digest
 -8623788747993822161 of the thousand random programs and nesting through `Steps` and `StepsJava`. The checks that
@@ -106,7 +118,10 @@ Approximated or different in cost:
 - When a foreign computation is cancelled for one signal and another signal crosses it during that cancellation, the
   first signal goes on. The reference does the same, through its `FAfter` frames.
 
-## 4. Tests
+#> HISTORY (2026-10-14): `OnOkay` and the module `okay/` are gone — the okay platform runs on okay-core's one monad,
+> its bridge `OnCore`; `StepsJava` is gone too, `Steps` the one reference. Kept as the record of the design.
+
+# 4. Tests
 
 `okay/src/test`: `TestTckOkay` (the TCK, `others = List(Steps, StepsJava.INSTANCE)`) and `TestOkayPrograms`. The
 second covers an okay program (State, Writer, Choose) exported and run under the reference machines' standard
