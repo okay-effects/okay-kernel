@@ -73,7 +73,7 @@ no other home:
 
 - `okay.core.kernel.OnCore` (okay-core): the bridge over the one monad — every delimiter a `Deep` handler of one
   request effect over one row, `k` data, export through `Step` ([okay-core's docs/kernel.md](../okay-core/docs/kernel.md));
-- `okay.core.Kernel.EFFECTS` (okay-java, branch `kernel-native`): a capture per `k`, nothing allocated a delimiter
+- `okay.core.Kernel.EFFECTS` (okay-java): a capture per `k`, nothing allocated a delimiter
   crossed ([okay-java's docs/kernel.md](../okay-java/docs/kernel.md));
 - `Steps` (`steps/`): the reference — a step a node over an explicit stack of frames, exact rather than fast, the
   TCK's digest its; one, in Scala, on every platform (its copy in Java, `steps-java`, is gone, 2026-10-14: one
