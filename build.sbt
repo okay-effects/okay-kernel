@@ -198,19 +198,8 @@ lazy val okayCompat = (project in file("okay"))
  * repository (okay-java: `./gradlew publishToMavenLocal`; okay-core: `sbt kernel/publishM2`), nesting through the
  * others. Tests only, not published
  */
-/** OKAY-ONE AS AN IMPLEMENTATION: the kernel's Effects and Control on okay-one's machine (okay.kernel.onone.OnOne) —
- * okay-one published locally from its HEAD (`sbt publishLocal` there); its TCK, nesting through the reference */
-lazy val onOne = (project in file("one"))
-  .dependsOn(api, tck % Test, steps.jvm % Test, stepsJava % Test)
-  .settings(
-    name := "okay-kernel-one",
-    scalacOptions ++= Seq("-deprecation"),
-    resolvers += Resolver.defaultLocal,
-    libraryDependencies ++= Seq("dev.okay" %% "okay-one" % "0.1.0-SNAPSHOT", "org.scalameta" %% "munit" % "1.2.3" % Test),
-    Test / fork := true)
-
 lazy val integration = (project in file("integration"))
-  .dependsOn(tck, steps.jvm, stepsJava, onOne)
+  .dependsOn(tck, steps.jvm, stepsJava)
   .settings(
     // okay-core and okay-java implement the API themselves (okay.core.kernel.OnCore, okay.core.Kernel), published locally
     libraryDependencies ++= Seq("dev.okay" % "okay-java" % "0.2.0-SNAPSHOT" % Test, "okay-core" %% "okay-core" % "0.1.0-SNAPSHOT" % Test),

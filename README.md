@@ -67,23 +67,21 @@ in Scala, `okay.jkernel.*` in Java), so both jars share one classpath. An operat
 
 ## The ecosystem: one protocol, the implementations apart
 
-okay-core (Scala 3), okay-java (Java), okay (the platform) and okay-one (the kernel being written, where okay-core's
-one monad comes from) are libraries of their own. The kernel is the layer they share — the API every language and
+okay-core (Scala 3, the one monad — its kernel `okay.one`, written first in the okay-one repository), okay-java (Java)
+and okay (the platform) are libraries of their own. The kernel is the layer they share — the API every language and
 platform reads, the TCK, the reference machines — and each implements it in its own repository, or here where it has
 no other home:
 
-- `okay.core.kernel.OnCore.zero`, `.cont` (okay-core): the kernel's programs the machines' own nodes, operations
-  found by their key's identity, export and import ([okay-core's docs/kernel.md](../okay-core/docs/kernel.md));
+- `okay.core.kernel.OnCore` (okay-core): the bridge over the one monad — every delimiter a `Deep` handler of one
+  request effect over one row, `k` data, export through `Step` ([okay-core's docs/kernel.md](../okay-core/docs/kernel.md));
 - `okay.core.Kernel.EFFECTS` (okay-java, branch `kernel-native`): a capture per `k`, nothing allocated a delimiter
   crossed ([okay-java's docs/kernel.md](../okay-java/docs/kernel.md));
-- `okay.kernel.onone.OnOne` (`one/` here): okay-one's machine — every delimiter of the bridge a `Deep` handler of
-  one request effect over one row, `k` data, export through okay-one's `Step`;
 - `okay.kernel.onokay.OnOkay` (`okay/` here): okay's machine — every delimiter a `Reset`, every request a `Shift0`;
 - `Steps` (`steps/`, Scala) and `StepsJava` (`steps-java/`, Java): the reference — a step a node over an explicit
   stack of frames, the TCK's digest theirs.
 
-`integration/` runs the TCK on each of okay-core's two, okay-java, okay-one and the two references in one process,
-each importing the others' computations: 96 checks. okay is checked by its own module's TCK (its `okay.cont.*` and
+`integration/` runs the TCK on each of okay-core, okay-java and the two references in one process, each importing
+the others' computations: 64 checks. okay is checked by its own module's TCK (its `okay.cont.*` and
 okay-core's are one name, two classes).
 
 ## What the kernel costs
@@ -98,14 +96,15 @@ state, a log), written once over `Effects`, on each implementation — beside th
 | okay-core cont (`OnCore.cont`) | 247 | 1 895 962 | 147 | 1 415 329 |
 | okay-core zero (`OnCore.zero`) | 310 ± 119 | 1 828 738 | 124 | 1 308 757 |
 | steps-java (the reference, Java) | 427 | 2 484 411 | — | — |
-| okay-one (`OnOne`, the first cut) | 449 | 2 754 379 | 165 | 1 023 681 |
+| okay-core on the one monad (`OnCore`, 2026-10-14) | 459 | 2 918 699 | 230 | 1 443 474 |
 | steps (the reference, Scala) | 535 | 2 378 644 | — | — |
 | okay (`OnOkay`) | 557 | 4 405 892 | — | — |
 
-The protocol's program costs about twice each one's own on the native bridges (okay-java, okay-core): `Program.in`,
-the `Fn` closures and the standard handlers built per order. `OnOne` is the first cut — every kernel handler a `Deep`
-clause and a level of `k`, every operation a request and a read of its answer; what okay-core's native path went
-through (474 → 231) is ahead of it.
+The protocol's program costs about twice each one's own on the native bridges (okay-java, okay-core's of before):
+`Program.in`, the `Fn` closures and the standard handlers built per order. okay-core's `OnCore` on the one monad is a
+library over `Deep` — every kernel handler a `Deep` clause and a level of `k`, every operation a request captured and
+forwarded at each delimiter, a read of its answer — what its native path of before went through (474 → 231) is ahead
+of it; the rows of `OnCore.zero`/`.cont` are those machines' last, kept for the comparison.
 
 ## Scala's own (`scala/`, `dev.okay::okay-kernel-scala`)
 
