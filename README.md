@@ -76,13 +76,12 @@ no other home:
   request effect over one row, `k` data, export through `Step` ([okay-core's docs/kernel.md](../okay-core/docs/kernel.md));
 - `okay.core.Kernel.EFFECTS` (okay-java, branch `kernel-native`): a capture per `k`, nothing allocated a delimiter
   crossed ([okay-java's docs/kernel.md](../okay-java/docs/kernel.md));
-- `okay.kernel.onokay.OnOkay` (`okay/` here): okay's machine — every delimiter a `Reset`, every request a `Shift0`;
 - `Steps` (`steps/`, Scala) and `StepsJava` (`steps-java/`, Java): the reference — a step a node over an explicit
   stack of frames, the TCK's digest theirs.
 
 `integration/` runs the TCK on each of okay-core, okay-java and the two references in one process, each importing
-the others' computations: 64 checks. okay is checked by its own module's TCK (its `okay.cont.*` and
-okay-core's are one name, two classes).
+the others' computations: 64 checks. The okay platform runs on okay-core's one monad (2026-10-14), so its
+bridge is `OnCore` — the module `okay/` (`OnOkay`, okay-cont's machine) is gone with okay-cont.
 
 ## What the kernel costs
 
@@ -98,7 +97,7 @@ state, a log), written once over `Effects`, on each implementation — beside th
 | steps-java (the reference, Java) | 427 | 2 484 411 | — | — |
 | okay-core on the one monad (`OnCore`, 2026-10-14) | 459 | 2 918 699 | 230 | 1 443 474 |
 | steps (the reference, Scala) | 535 | 2 378 644 | — | — |
-| okay (`OnOkay`) | 557 | 4 405 892 | — | — |
+| okay (`OnOkay`, okay-cont's machine, gone 2026-10-14) | 557 | 4 405 892 | — | — |
 
 The protocol's program costs about twice each one's own on the native bridges (okay-java, okay-core's of before):
 `Program.in`, the `Fn` closures and the standard handlers built per order. okay-core's `OnCore` on the one monad is a

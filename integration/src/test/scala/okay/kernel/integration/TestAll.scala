@@ -6,8 +6,8 @@ import okay.kernel.tck.TckSuite
 
 /** EVERY IMPLEMENTATION, ONE PROCESS: the TCK on each, nesting through all the others — a program of one run under the
  * handlers of another, through four machines: okay-core's (the one monad) and okay-java's (each implementing the API
- * itself), the reference's two. okay (okay-kernel-okay) is checked by its own module's TCK: okay and okay-core both define
- * `okay.core.*` — one package, two libraries — so they cannot share a classpath */
+ * itself), the reference's two. The okay platform itself runs on okay-core's one monad (2026-10-14):
+ * its bridge is `OnCore` */
 object All {
   val every: List[(String, Effects)] = List(
     "okay-core" -> okay.core.kernel.OnCore,
