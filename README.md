@@ -12,6 +12,7 @@ handlers written in another. The design: [docs/design.md](docs/design.md).
 | `scala` (`okay-kernel-scala`) | Scala's own: `TypeOf` (exact types found by the compiler), `@@`; on Scala.js and Scala Native the API's mirror. Scala 3 and 2.13 from one source |
 | `steps` (`okay-kernel-steps`) | the reference machine: `Effects` and the protocol, exact rather than fast. Scala 3 and 2.13, JVM, JS, Native |
 | `tck` (`okay-kernel-tck`) | what every implementation is checked by, on its own `Effects`: laws, standard handlers, the protocol, nesting through implementations, a thousand random programs with one digest |
+| `js` (`okay-kernel-js`) | the protocol in JavaScript: a computation a plain JS object (`start(host)`, its steps, `k`, a host), exported from Scala.js as an ES module (`sbt kernelJs/fastLinkJS`) — so a JS implementation (okay-ts) and the kernel's run each other's programs; an effect by its type's name (`State[Integer]`, `Choose`, or one's own) |
 | `integration` | the TCK on every implementation in one process, each nesting through the others (not published) |
 | `bench` | one program written once over `Effects`, measured on each implementation (JMH, not published) |
 
