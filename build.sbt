@@ -89,6 +89,19 @@ lazy val bench = (project in file("bench"))
     libraryDependencies ++= Seq("dev.okay" % "okay-java" % "0.2.0-SNAPSHOT", "okay-core" %% "okay-core" % "0.1.0-SNAPSHOT"),
     publish / skip := true)
 
+/**
+ * THE PROTOCOL IN JAVASCRIPT: a computation as a plain JS object (start, its steps, k, a host), exported from Scala.js —
+ * so a JS implementation (okay-ts) and the kernel's run each other's programs. An ES module: `kernelJs/fastLinkJS`
+ */
+lazy val kernelJs = (project in file("js"))
+  .enablePlugins(ScalaJSPlugin)
+  .dependsOn(steps.js)
+  .settings(
+    name := "okay-kernel-js",
+    scalacOptions ++= Seq("-deprecation"),
+    scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.ESModule)),
+    publish / skip := true)
+
 lazy val root = (project in file("."))
   .aggregate(api, scalaApi.jvm, scalaApi.js, scalaApi.native, steps.jvm, steps.js, steps.native, tck)
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
