@@ -31,6 +31,11 @@ class OnKernel private (e: KEffects) extends Runner {
 
   def split[E[_], R[_], Rest[_], A](p: Prog[A])(implicit s: Place): Prog[A] = k.toEnd(p, s.at)
   def embed[R[_], S[_], A](p: Prog[A])(implicit s: Vector[Int]): Prog[A] = k.remap[A](p, s)
+  /** `E`'s place to the new last, 0, the others one further in */
+  protected[effects] def interposed[E[_], R[_], A](p: Prog[A])(implicit in: Place): Prog[A] = {
+    val at = in.at
+    k.remap[A](p, i => if (i == at) 0 else i + 1)
+  }
 
   def handleLast[E[_], R[_], A, B](p: Prog[A], h: Handler[E, R, A, B]): Prog[B] =
     k.general[A, B](p, a => h.ret(a), new Clause[B] {
