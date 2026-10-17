@@ -1,11 +1,11 @@
 package okay.effects.kernel
 
 import okay.kernel.{Effects => KEffects, Prog}
-import okay.effects.Effects
+import okay.effects.Runner
 import scala.annotation.unchecked.uncheckedVariance
 
 /** okay-effects' interface on okay-kernel's protocol (`Protocol`), for both compilers: its rows' places numbers */
-class OnKernel private (e: KEffects) extends Effects {
+class OnKernel private (e: KEffects) extends Runner {
   import Protocol._
   private val k = new Protocol(e)
 
@@ -44,5 +44,5 @@ class OnKernel private (e: KEffects) extends Effects {
 
 object OnKernel {
   /** okay-effects' interface on the implementation `e` of the protocol, seen through the interface only; its standard effects its `std` */
-  def on(e: KEffects): Effects = new OnKernel(e)
+  def on(e: KEffects): Runner = new OnKernel(e)
 }
