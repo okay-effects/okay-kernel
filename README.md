@@ -13,6 +13,7 @@ handlers written in another. The design: [docs/design.md](docs/design.md).
 | `steps` (`okay-kernel-steps`) | the reference machine: `Effects` and the protocol, exact rather than fast. Scala 3 and 2.13, JVM, JS, Native |
 | `tck` (`okay-kernel-tck`) | what every implementation is checked by, on its own `Effects`: laws, standard handlers, the protocol, nesting through implementations, a thousand random programs with one digest |
 | `js` (`okay-kernel-js`) | the protocol in JavaScript: a computation a plain JS object (`start(host)`, its steps, `k`, a host), exported from Scala.js as an ES module (`sbt kernelJs/fastLinkJS`) — so a JS implementation (okay-ts) and the kernel's run each other's programs; an effect by its type's name (`State[Integer]`, `Choose`, or one's own) |
+| `effects` (`okay-effects-kernel`) | okay-effects' interface (okay-simple's `okay.effects`, one interface of effects for Scala 3 and 2) on the protocol: `OnKernel.on(effects)` on any implementation — an operation of one key carrying its place in the row, each okay-effects handler one of the protocol's. Scala 3 and 2.13; okay-effects' suite (`okay-effects-tck`) its test, on the reference machine, okay-java and okay-core's bridge |
 | `integration` | the TCK on every implementation in one process, each nesting through the others (not published) |
 | `bench` | one program written once over `Effects`, measured on each implementation (JMH, not published) |
 

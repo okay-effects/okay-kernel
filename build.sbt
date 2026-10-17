@@ -102,7 +102,27 @@ lazy val kernelJs = (project in file("js"))
     scalaJSLinkerConfig ~= (_.withModuleKind(ModuleKind.ESModule)),
     publish / skip := true)
 
+/**
+ * OKAY-EFFECTS' INTERFACE ON THE PROTOCOL (okay-simple's `okay.effects`, one interface of effects for Scala 3 and 2):
+ * the bridge `okay.effects.kernel.OnKernel.on(effects)`, on any implementation of the protocol — the reference
+ * machine, okay-java, okay-core's — an operation of one key carrying its place in the row. Scala 3 and 2.13:
+ * `dev.okay::okay-effects-kernel`. okay-effects and its suite (`okay-effects-tck`) published locally from okay-simple
+ * (`sbt +effects/publishLocal +tck/publishLocal` there); okay-java and okay-core as `integration` has them
+ */
+lazy val effects = (project in file("effects"))
+  .dependsOn(api, steps.jvm % Test)
+  .settings(
+    name := "okay-effects-kernel",
+    crossScalaVersions := Seq("3.9.0", "2.13.18"),
+    scalacOptions ++= Seq("-deprecation"),
+    libraryDependencies ++= Seq(
+      "dev.okay" %% "okay-effects" % "0.1.0-SNAPSHOT",
+      "dev.okay" %% "okay-effects-tck" % "0.1.0-SNAPSHOT" % Test,
+      "dev.okay" % "okay-java" % "0.2.0-SNAPSHOT" % Test) ++
+      (if (scalaVersion.value.startsWith("3")) Seq("okay-core" %% "okay-core" % "0.1.0-SNAPSHOT" % Test) else Nil),
+    Test / fork := true)
+
 lazy val root = (project in file("."))
-  .aggregate(api, scalaApi.jvm, scalaApi.js, scalaApi.native, steps.jvm, steps.js, steps.native, tck)
+  .aggregate(api, scalaApi.jvm, scalaApi.js, scalaApi.native, steps.jvm, steps.js, steps.native, tck, effects)
   .settings(publish / skip := true, Compile / sources := Nil, Test / sources := Nil)
 
