@@ -4,7 +4,7 @@
 # okay on the kernel
 
 `okay/` (sbt `okayCompat`, artifact `dev.okay::okay-kernel-okay`, Scala 3.9, JVM) is the bridge between okay and the
-kernel's protocol. It depends on okay's published artifact (`io.github.sergey-scherbina::okay:0.2.0-SNAPSHOT`, from
+kernel's protocol. It depends on okay's published artifact (`io.github.okay-effects::okay:0.2.0-SNAPSHOT`, from
 ivy local) and on the kernel's API, and changes nothing in okay. To publish okay locally, run this in okay:
 
 ```
