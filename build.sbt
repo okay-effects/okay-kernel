@@ -116,8 +116,8 @@ lazy val effects = (project in file("effects"))
     crossScalaVersions := Seq("3.9.0", "2.13.18"),
     scalacOptions ++= Seq("-deprecation"),
     libraryDependencies ++= Seq(
-      "dev.okay" %% "okay-effects" % "0.1.0-SNAPSHOT",
-      "dev.okay" %% "okay-effects-tck" % "0.1.0-SNAPSHOT" % Test,
+      "io.github.okay-effects" %% "okay-effects" % "0.1.0-SNAPSHOT",
+      "io.github.okay-effects" %% "okay-effects-tck" % "0.1.0-SNAPSHOT" % Test,
       "dev.okay" % "okay-java" % "0.2.0-SNAPSHOT" % Test) ++
       (if (scalaVersion.value.startsWith("3")) Seq("okay-core" %% "okay-core" % "0.1.0-SNAPSHOT" % Test) else Nil),
     Test / fork := true)
