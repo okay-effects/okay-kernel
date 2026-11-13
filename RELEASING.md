@@ -45,7 +45,8 @@ libraryDependencies += "io.github.okay-effects" % "okay-kernel-api" % "0.1.0"
 3. Onto `gh-pages`, under `maven/`, beside the releases already there, and the tag:
 
    ```sh
-   git worktree add /tmp/okay-kernel-pages gh-pages   # the first time: git worktree add --orphan -b gh-pages /tmp/okay-kernel-pages
+   # the first time: git worktree add --orphan -b gh-pages /tmp/okay-kernel-pages
+   git worktree add /tmp/okay-kernel-pages gh-pages
    mkdir -p /tmp/okay-kernel-pages/maven
    rsync -a target/pages-maven/ /tmp/okay-kernel-pages/maven/
    touch /tmp/okay-kernel-pages/.nojekyll
