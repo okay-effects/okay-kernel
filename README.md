@@ -84,6 +84,13 @@ of it; the rows of `OnCore.zero`/`.cont` are those machines' last, kept for the 
 a singleton's value or a class), named by hand for anything else — `State.key[Int](typeOf[Int])`; on Scala.js and
 Scala Native the API's mirror, the same names and signatures. One source for Scala 3 and 2.13.
 
+## Released: the API
+
+`io.github.okay-effects:okay-kernel-api:0.1.0`, from okay-kernel's Maven repository on GitHub Pages,
+https://okay-effects.github.io/okay-kernel/maven (Gradle: `maven("https://okay-effects.github.io/okay-kernel/maven")`;
+sbt: `resolvers += "okay-kernel" at "https://okay-effects.github.io/okay-kernel/maven"`). The other modules are
+built and published locally. How a release is made: [RELEASING.md](RELEASING.md).
+
 ## Tests
 
 `sbt test`: the API's (Java, JUnit), Scala's and the reference machine's on the JVM, Scala.js and Scala Native, the

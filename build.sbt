@@ -18,7 +18,31 @@ lazy val api = (project in file("api"))
     javacOptions ++= Seq("--release", "21", "-Xlint:all", "-Xlint:-serial", "-Werror"),
     Compile / doc / javacOptions := Seq("--release", "21"),
     libraryDependencies ++= Seq("com.github.sbt.junit" % "jupiter-interface" % "0.19.0" % Test, "org.junit.jupiter" % "junit-jupiter" % "5.13.4" % Test),
-    Compile / packageDoc / publishArtifact := false)
+    Compile / packageDoc / publishArtifact := apiRelease.isDefined)
+  .settings(apiReleaseSettings)
+
+/**
+ * THE API'S RELEASE (RELEASING.md): `sbt -Drelease.api=0.1.0 api/publish` writes
+ * `io.github.okay-effects:okay-kernel-api:0.1.0` (jar, sources, javadoc) into target/pages-maven, for okay-kernel's
+ * Maven repository on GitHub Pages. Only then: without the property the module stays `dev.okay`, the SNAPSHOT,
+ * as the local builds that depend on it (okay-core, this build's own modules) know it
+ */
+lazy val apiRelease = sys.props.get("release.api")
+lazy val apiReleaseSettings = apiRelease.toSeq.flatMap { v =>
+  Seq(
+    organization := "io.github.okay-effects",
+    version := v,
+    description := "okay-kernel's API: the protocol by which implementations of effects work with each other",
+    homepage := Some(url("https://github.com/okay-effects/okay-kernel")),
+    licenses := Seq("Apache-2.0" -> url("https://www.apache.org/licenses/LICENSE-2.0.txt")),
+    developers := List(Developer("sergey-scherbina", "Sergiy Shcherbyna", "sergey.scherbina@gmail.com",
+      url("https://github.com/sergey-scherbina"))),
+    scmInfo := Some(ScmInfo(url("https://github.com/okay-effects/okay-kernel"),
+      "scm:git:https://github.com/okay-effects/okay-kernel.git")),
+    publishMavenStyle := true,
+    Test / publishArtifact := false,
+    publishTo := Some(MavenCache("pages", (ThisBuild / baseDirectory).value / "target" / "pages-maven")))
+}
 
 /** the API's mirror for Scala.js and Scala Native, where there is no Java: the same names and signatures, in Scala */
 def apiMirror(base: File) = base.getParentFile / "src" / "main" / "scala-mirror"
